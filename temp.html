@@ -1,39 +1,19 @@
-# certificates/services/adcs.py
-import subprocess
-import re
-from datetime import datetime
+# certificates/services/sync.py
+from certificates.models import Certificate
+from certificates.services.adcs import fetch_certificates
 
 
-CERTUTIL_CMD = ["certutil", "-view", "-restrict", "Disposition=20"]
+def sync_certificates():
+    certs = fetch_certificates()
 
-
-def fetch_certificates():
-    result = subprocess.run(
-        CERTUTIL_CMD,
-        capture_output=True,
-        text=True,
-        encoding="cp866",
-    )
-
-    blocks = result.stdout.split("====")
-    certificates = []
-
-    for block in blocks:
-        cn = re.search(r"Выданное различающееся имя:\s+CN=(.+)", block)
-        serial = re.search(r"Серийный номер:\s+([A-F0-9]+)", block)
-        issued = re.search(r"Дата вступления сертификата в силу:\s+(.+)", block)
-        expires = re.search(r"Дата окончания срока действия сертификата:\s+(.+)", block)
-
-        if not (cn and serial and issued and expires):
-            continue
-
-        certificates.append({
-            "serial_number": serial.group(1),
-            "common_name": cn.group(1),
-            "issued_at": datetime.strptime(issued.group(1), "%d.%m.%Y %H:%M"),
-            "expires_at": datetime.strptime(expires.group(1), "%d.%m.%Y %H:%M"),
-            "template_name": "UNKNOWN",
-            "san": "",
-        })
-
-    return certificates
+    for cert in certs:
+        Certificate.objects.update_or_create(
+            serial_number=cert["serial_number"],
+            defaults={
+                "common_name": cert["common_name"],
+                "issued_at": cert["issued_at"],
+                "expires_at": cert["expires_at"],
+                "template_name": cert["template_name"],
+                "san": cert["san"],
+            }
+        )
