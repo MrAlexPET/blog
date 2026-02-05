@@ -1,15 +1,17 @@
 <li class="nav-item">
-                <a class="nav-link" href="#" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
-                    <i class="fas fa-fw fa-cog"></i>
-                    <span>Components</span>
-                </a>
-                <div id="collapseTwo" class="collapse show" aria-labelledby="headingTwo" data-parent="#accordionSidebar" style="">
-                    <div class="bg-white py-2 collapse-inner rounded">
-                        <h6 class="collapse-header">Custom Components:</h6>
-                        <a class="collapse-item" href="buttons.html">Buttons</a>
-                        <a class="collapse-item" href="cards.html">Cards</a>
-                    </div>
-                </div>
-            </li>
-
-Вот как выпадающий список реализован в SB ADMIN 2
+    <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseCertificates"
+       aria-expanded="true" aria-controls="collapseCertificates">
+        <i class="fas fa-fw fa-certificate"></i>
+        <span>Certificates</span>
+    </a>
+    <div id="collapseCertificates" class="collapse" aria-labelledby="headingCertificates" data-parent="#accordionSidebar">
+        <div class="bg-white py-2 collapse-inner rounded">
+            <h6 class="collapse-header">Certificate Filters:</h6>
+            <a class="collapse-item" href="{% url 'certificates:all' %}">All</a>
+            <a class="collapse-item" href="{% url 'certificates:active' %}">Active</a>
+            <a class="collapse-item" href="{% url 'certificates:expiring' %}">Expiring</a>
+            <a class="collapse-item" href="{% url 'certificates:expired' %}">Expired</a>
+            <a class="collapse-item" href="{% url 'certificates:revoked' %}">Revoked</a>
+        </div>
+    </div>
+</li>
