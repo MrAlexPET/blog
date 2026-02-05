@@ -1,20 +1,30 @@
-{% extends 'base.html' %}
+<form method="get" class="form-inline mb-3">
+    <input
+        type="text"
+        name="search"
+        class="form-control mr-2"
+        placeholder="Search CN / SAN / Serial"
+        value="{{ request.GET.search }}"
+    >
 
-{% block content %}
-<div class="container mt-4">
-    <h1>Certificate Details</h1>
-    <div class="card shadow mb-4">
-        <div class="card-body">
-            <p><strong>Common Name (CN):</strong> {{ cert.common_name }}</p>
-            <p><strong>Template:</strong> {{ cert.template_name }}</p>
-            <p><strong>Serial Number:</strong> {{ cert.serial_number }}</p>
-            <p><strong>Issued At:</strong> {{ cert.issued_at }}</p>
-            <p><strong>Expires At:</strong> {{ cert.expires_at }}</p>
-            <p><strong>SAN:</strong> {{ cert.san }}</p>
-            <p><strong>IP Address:</strong> {{ cert.ip_address }}</p>
-            <p><strong>Revoked:</strong> {{ cert.revoked }}</p>
-        </div>
-    </div>
-    <a href="{% url 'certificates_list' %}" class="btn btn-secondary">Back to List</a>
-</div>
-{% endblock %}
+    <select name="template" class="form-control mr-2">
+        <option value="">All templates</option>
+        {% for t in templates %}
+            <option value="{{ t }}" {% if request.GET.template == t %}selected{% endif %}>
+                {{ t }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <select name="status" class="form-control mr-2">
+        <option value="">All statuses</option>
+        <option value="active" {% if request.GET.status == "active" %}selected{% endif %}>Active</option>
+        <option value="expiring" {% if request.GET.status == "expiring" %}selected{% endif %}>Expiring</option>
+        <option value="expired" {% if request.GET.status == "expired" %}selected{% endif %}>Expired</option>
+        <option value="revoked" {% if request.GET.status == "revoked" %}selected{% endif %}>Revoked</option>
+    </select>
+
+    <button type="submit" class="btn btn-primary">
+        Apply
+    </button>
+</form>
