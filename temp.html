@@ -1,58 +1,88 @@
 import subprocess
+import re
 from datetime import datetime
+from django.utils import timezone
 from certificates.models import Certificate
 
 
-CERTUTIL_CMD = [
-    "certutil",
-    "-view",
-    "-restrict", "Disposition=20",
-    "-out", "SerialNumber,CommonName,CertificateTemplate,NotBefore,NotAfter"
-]
+CERTUTIL_CMD = ["certutil", "-view"]
+
+
+def extract_cn(dn: str) -> str:
+    match = re.search(r"CN=([^,]+)", dn)
+    return match.group(1) if match else dn
+
+
+def extract_template(block: str) -> str:
+    m = re.search(r'╪рсыюэ ёхЁЄшЇшърЄр:\s+".*"\s*([a-zA-Z0-9_\-]+)', block)
+    if m:
+        return m.group(1)
+
+    m = re.search(r'╪рсыюэ ёхЁЄшЇшърЄр:\s+"([a-zA-Z0-9_\-]+)"', block)
+    return m.group(1) if m else "UNKNOWN"
+
+
+def extract_san(block: str) -> tuple[str, str | None]:
+    dns = re.findall(r'DNS-шь =([^\s]+)', block)
+    ip = re.search(r'IP-рфЁхё=([0-9.]+)', block)
+
+    san = ", ".join(dns)
+    ip_addr = ip.group(1) if ip else None
+
+    return san, ip_addr
 
 
 def sync_certificates():
     result = subprocess.run(
         CERTUTIL_CMD,
         capture_output=True,
+        text=True,
+        encoding="cp866",
+        errors="ignore",
     )
 
-    text = result.stdout.decode("cp866", errors="ignore")
+    text = result.stdout
+
+    blocks = re.split(r"╤ЄЁюър", text)
 
     saved = 0
-    current = {}
 
-    for line in text.splitlines():
-        if ":" not in line:
+    for block in blocks:
+        print(block)
+        serial = re.search(r' ╤хЁшщэ√щ эюьхЁ:\s+"([0-9A-Fa-f]+)"', block)
+        dn = re.search(r'┬√фрээюх Ёрчышўр■∙ххё  шь :\s+"(.+)"', block)
+        issued = re.search(r'─рЄр тёЄєяыхэш  ёхЁЄшЇшърЄр т ёшыє:\s+(.+)', block)
+        expires = re.search(r'─рЄр юъюэўрэш  ёЁюър фхщёЄтш  ёхЁЄшЇшърЄр:\s+(.+)', block)
+
+        if not (serial and issued and expires):
             continue
 
-        key, value = line.split(":", 1)
-        key = key.strip()
-        value = value.strip()
+        issued_at = timezone.make_aware(
+            datetime.strptime(issued.group(1), "%d.%m.%Y %H:%M")
+        )
+        expires_at = timezone.make_aware(
+            datetime.strptime(expires.group(1), "%d.%m.%Y %H:%M")
+        )
 
-        if key == "SerialNumber":
-            current["serial"] = value
-        elif key == "CommonName":
-            current["cn"] = value
-        elif key == "CertificateTemplate":
-            current["template"] = value
-        elif key == "NotBefore":
-            current["issued"] = value
-        elif key == "NotAfter":
-            current["expires"] = value
+        common_name = extract_cn(dn.group(1)) if dn else "UNKNOWN"
+        template = extract_template(block)
+        san, ip_addr = extract_san(block)
 
-        if len(current) == 5:
-            Certificate.objects.update_or_create(
-                serial_number=current["serial"],
-                defaults={
-                    "common_name": current["cn"],
-                    "template_name": current["template"],
-                    "issued_at": datetime.strptime(current["issued"], "%d.%m.%Y %H:%M"),
-                    "expires_at": datetime.strptime(current["expires"], "%d.%m.%Y %H:%M"),
-                    "san": "",
-                }
-            )
-            saved += 1
-            current = {}
+        revoked = not re.search(r'─рЄр юЄч√тр:\s+EMPTY', block)
+
+        Certificate.objects.update_or_create(
+            serial_number=serial.group(1),
+            defaults={
+                "common_name": common_name,
+                "issued_at": issued_at,
+                "expires_at": expires_at,
+                "template_name": template,
+                "san": san,
+                "ip_address": ip_addr,
+                "revoked": revoked,
+            }
+        )
+
+        saved += 1
 
     print(f"✔ Saved {saved} certificates")
