@@ -1,1 +1,79 @@
-exo
+def extract_cn(dn: str) -> str:
+    match = re.search(r"CN=([^,]+)", dn)
+    return match.group(1) if match else dn
+
+
+def extract_template(block: str) -> str:
+    m = re.search(r'Шаблон сертификата:\s+".*"\s*([a-zA-Z0-9_\-]+)', block)
+    if m:
+        return m.group(1)
+
+    m = re.search(r'Шаблон сертификата:\s+"([a-zA-Z0-9_\-]+)"', block)
+    return m.group(1) if m else "UNKNOWN"
+
+
+def extract_san(block: str) -> tuple[str, str | None]:
+    dns = re.findall(r'DNS-имя=([^\s]+)', block)
+    ip = re.search(r'IP-адрес=([0-9.]+)', block)
+
+    san = ", ".join(dns)
+    ip_addr = ip.group(1) if ip else None
+
+    return san, ip_addr
+
+
+
+
+def sync_certificates():
+    result = subprocess.run(
+        CERTUTIL_CMD,
+        capture_output=True,
+        text=True,
+        encoding="cp866",
+        errors="ignore",
+    )
+
+    text = result.stdout
+
+    blocks = re.split(r'\n\s*Выданный ИД запроса:', text)
+
+    saved = 0
+
+    for block in blocks[1:]:
+        serial = re.search(r'Серийный номер:\s+"([0-9A-Fa-f]+)"', block)
+        dn = re.search(r'Выданное различающееся имя:\s+"(.+)"', block)
+        issued = re.search(r'Дата вступления сертификата в силу:\s+(.+)', block)
+        expires = re.search(r'Дата окончания срока действия сертификата:\s+(.+)', block)
+
+        if not (serial and issued and expires):
+            continue
+
+        issued_at = timezone.make_aware(
+            datetime.strptime(issued.group(1), "%d.%m.%Y %H:%M")
+        )
+        expires_at = timezone.make_aware(
+            datetime.strptime(expires.group(1), "%d.%m.%Y %H:%M")
+        )
+
+        common_name = extract_cn(dn.group(1)) if dn else "UNKNOWN"
+        template = extract_template(block)
+        san, ip_addr = extract_san(block)
+
+        revoked = not re.search(r'Дата отзыва:\s+EMPTY', block)
+
+        Certificate.objects.update_or_create(
+            serial_number=serial.group(1),
+            defaults={
+                "common_name": common_name,
+                "issued_at": issued_at,
+                "expires_at": expires_at,
+                "template_name": template,
+                "san": san,
+                "ip_address": ip_addr,
+                "revoked": revoked,
+            }
+        )
+
+        saved += 1
+
+    print(f"✔ Saved {saved} certificates")
