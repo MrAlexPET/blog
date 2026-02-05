@@ -1,30 +1,39 @@
-<form method="get" class="form-inline mb-3">
-    <input
-        type="text"
-        name="search"
-        class="form-control mr-2"
-        placeholder="Search CN / SAN / Serial"
-        value="{{ request.GET.search }}"
-    >
+{% extends "base.html" %}
+{% block content %}
 
-    <select name="template" class="form-control mr-2">
-        <option value="">All templates</option>
-        {% for t in templates %}
-            <option value="{{ t }}" {% if request.GET.template == t %}selected{% endif %}>
-                {{ t }}
-            </option>
-        {% endfor %}
-    </select>
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">Certificate Templates</h1>
 
-    <select name="status" class="form-control mr-2">
-        <option value="">All statuses</option>
-        <option value="active" {% if request.GET.status == "active" %}selected{% endif %}>Active</option>
-        <option value="expiring" {% if request.GET.status == "expiring" %}selected{% endif %}>Expiring</option>
-        <option value="expired" {% if request.GET.status == "expired" %}selected{% endif %}>Expired</option>
-        <option value="revoked" {% if request.GET.status == "revoked" %}selected{% endif %}>Revoked</option>
-    </select>
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Template</th>
+                            <th>Certificates</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in templates %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'certificates_by_template' t.template_name %}">
+                                    {{ t.template_name }}
+                                </a>
+                            </td>
+                            <td>{{ t.total }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2">No templates found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <button type="submit" class="btn btn-primary">
-        Apply
-    </button>
-</form>
+{% endblock %}
