@@ -1,17 +1,20 @@
-<li class="nav-item">
-    <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseCertificates"
-       aria-expanded="true" aria-controls="collapseCertificates">
-        <i class="fas fa-fw fa-certificate"></i>
-        <span>Certificates</span>
-    </a>
-    <div id="collapseCertificates" class="collapse" aria-labelledby="headingCertificates" data-parent="#accordionSidebar">
-        <div class="bg-white py-2 collapse-inner rounded">
-            <h6 class="collapse-header">Certificate Filters:</h6>
-            <a class="collapse-item" href="{% url 'certificates:all' %}">All</a>
-            <a class="collapse-item" href="{% url 'certificates:active' %}">Active</a>
-            <a class="collapse-item" href="{% url 'certificates:expiring' %}">Expiring</a>
-            <a class="collapse-item" href="{% url 'certificates:expired' %}">Expired</a>
-            <a class="collapse-item" href="{% url 'certificates:revoked' %}">Revoked</a>
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Certificate Details</h1>
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <p><strong>Common Name (CN):</strong> {{ cert.common_name }}</p>
+            <p><strong>Template:</strong> {{ cert.template_name }}</p>
+            <p><strong>Serial Number:</strong> {{ cert.serial_number }}</p>
+            <p><strong>Issued At:</strong> {{ cert.issued_at }}</p>
+            <p><strong>Expires At:</strong> {{ cert.expires_at }}</p>
+            <p><strong>SAN:</strong> {{ cert.san }}</p>
+            <p><strong>IP Address:</strong> {{ cert.ip_address }}</p>
+            <p><strong>Revoked:</strong> {{ cert.revoked }}</p>
         </div>
     </div>
-</li>
+    <a href="{% url 'certificates_list' %}" class="btn btn-secondary">Back to List</a>
+</div>
+{% endblock %}
