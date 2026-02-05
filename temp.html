@@ -1,3 +1,4 @@
+# adcs.py
 import subprocess
 import re
 from datetime import datetime
@@ -86,3 +87,24 @@ def sync_certificates():
         saved += 1
 
     print(f"✔ Saved {saved} certificates")
+
+    # sync_adcs.py
+    from django.core.management.base import BaseCommand
+from certificates.services.adcs import sync_certificates
+
+
+class Command(BaseCommand):
+    help = "Sync certificates from AD CS"
+
+    def handle(self, *args, **options):
+        sync_certificates()
+        self.stdout.write(self.style.SUCCESS("AD CS certificates synced"))
+
+# views.py
+def sync_certificates_views(request):
+    if request.method == "POST":
+        action = Command
+        action.handle()
+        messages.succes(request, "Certificates successfully synced from AD CS")
+
+    return redirect(request.META.get("HTTP_REFERER", "/"))
