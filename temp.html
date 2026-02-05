@@ -2,7 +2,7 @@
 {% block content %}
 
 <div class="container-fluid">
-    <h1 class="h3 mb-4 text-gray-800">Certificate Templates</h1>
+    <h1 class="h3 mb-4 text-gray-800">Virtual Machines</h1>
 
     <div class="card shadow mb-4">
         <div class="card-body">
@@ -10,23 +10,23 @@
                 <table class="table table-bordered">
                     <thead>
                         <tr>
-                            <th>Template</th>
+                            <th>VM</th>
                             <th>Certificates</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for t in templates %}
+                        {% for v in vms %}
                         <tr>
                             <td>
-                                <a href="{% url 'certificates_by_template' t.template_name %}">
-                                    {{ t.template_name }}
+                                <a href="{% url 'certificates_by_vm' v.vm %}">
+                                    {{ v.vm }}
                                 </a>
                             </td>
-                            <td>{{ t.total }}</td>
+                            <td>{{ v.total }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="2">No templates found</td>
+                            <td colspan="2">No virtual machines found</td>
                         </tr>
                         {% endfor %}
                     </tbody>
