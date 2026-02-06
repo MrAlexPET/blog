@@ -1,21 +1,52 @@
-<div class="row">
+<script>
+document.addEventListener("DOMContentLoaded", function () {
 
-    <div class="col-xl-8 col-lg-7">
-        <div class="card shadow mb-4">
+    const ctx = document.getElementById("certsExpirationChart");
+    if (!ctx) return;
 
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">
-                    Certificates Expiration Overview
-                </h6>
-            </div>
-
-            <div class="card-body">
-                <div class="chart-bar">
-                    <canvas id="certsExpirationChart"></canvas>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-</div>
+    new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: [
+                "Expired",
+                "0–7 days",
+                "8–30 days",
+                "31–90 days",
+                "90+ days"
+            ],
+            datasets: [{
+                label: "Certificates",
+                data: [
+                    {{ stats.expired }},
+                    {{ stats.days_0_7 }},
+                    {{ stats.days_8_30 }},
+                    {{ stats.days_31_90 }},
+                    {{ stats.days_90_plus }}
+                ],
+                backgroundColor: [
+                    "#e74a3b",
+                    "#f6c23e",
+                    "#fd7e14",
+                    "#36b9cc",
+                    "#1cc88a"
+                ],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
