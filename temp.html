@@ -1,39 +1,40 @@
-{% extends "base.html" %}
-{% block content %}
+from django.db import models
+from django.utils import timezone
 
-<div class="container-fluid">
-    <h1 class="h3 mb-4 text-gray-800">Virtual Machines</h1>
 
-    <div class="card shadow mb-4">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>VM</th>
-                            <th>Certificates</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for v in vms %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'certificates_by_vm' v.vm %}">
-                                    {{ v.vm }}
-                                </a>
-                            </td>
-                            <td>{{ v.total }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="2">No virtual machines found</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
+class Certificate(models.Model):
+    common_name = models.CharField(max_length=255)
+    template_name = models.CharField(max_length=255)
+    san = models.TextField()
+    issued_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    revoked = models.BooleanField(default=False)
 
-{% endblock %}
+    vm = models.CharField(max_length=255, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    purpose = models.TextField(blank=True)
+
+    serial_number = models.CharField(max_length=100, unique=True)
+
+    @property
+    def days_left(self):
+        return (self.expires_at - timezone.now()).days
+
+    @property
+    def is_expired(self):
+        return self.expires_at < timezone.now()
+
+    @property
+    def is_expiring_soon(self, days=30) -> bool:
+        return 0 <= self.days_left <= days
+
+    def __str__(self):
+        return self.common_name
+
+
+class CertificateGroup(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    certificates = models.ManyToManyField(Certificate, blank=True)
+
+    def __str__(self):
+        return self.name
