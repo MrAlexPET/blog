@@ -1,40 +1,132 @@
-from django.db import models
-from django.utils import timezone
+def dashboard(request):
+    now = timezone.now()
+
+    total = Certificate.objects.count()
+    active = Certificate.objects.filter(
+        revoked=False,
+        expires_at__gt=now
+    ).count()
+
+    expiring = Certificate.objects.filter(
+        revoked=False,
+        expires_at__gt=now,
+        expires_at__lte=now + timezone.timedelta(days=30)
+    ).count()
+
+    expired = Certificate.objects.filter(
+        expires_at__lte=now
+    ).count()
+
+    revoked = Certificate.objects.filter(revoked=True).count()
+
+    templates = (
+        Certificate.objects
+        .values("template_name")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:5]
+    )
+
+    context = {
+        "total": total,
+        "active": active,
+        "expiring": expiring,
+        "expired": expired,
+        "revoked": revoked,
+        "templates": templates,
+    }
+
+    return render(request, "certificates/dashboard.html", context)
 
 
-class Certificate(models.Model):
-    common_name = models.CharField(max_length=255)
-    template_name = models.CharField(max_length=255)
-    san = models.TextField()
-    issued_at = models.DateTimeField()
-    expires_at = models.DateTimeField()
-    revoked = models.BooleanField(default=False)
+{% extends "base.html" %}
+{% block content %}
 
-    vm = models.CharField(max_length=255, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    purpose = models.TextField(blank=True)
+<div class="container-fluid">
 
-    serial_number = models.CharField(max_length=100, unique=True)
+    <h1 class="h3 mb-4 text-gray-800">Dashboard</h1>
 
-    @property
-    def days_left(self):
-        return (self.expires_at - timezone.now()).days
+    <div class="row">
 
-    @property
-    def is_expired(self):
-        return self.expires_at < timezone.now()
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                        Total Certificates
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total }}</div>
+                </div>
+            </div>
+        </div>
 
-    @property
-    def is_expiring_soon(self, days=30) -> bool:
-        return 0 <= self.days_left <= days
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                        Active
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active }}</div>
+                </div>
+            </div>
+        </div>
 
-    def __str__(self):
-        return self.common_name
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                        Expiring (&lt;30 days)
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ expiring }}</div>
+                </div>
+            </div>
+        </div>
 
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                        Expired
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ expired }}</div>
+                </div>
+            </div>
+        </div>
 
-class CertificateGroup(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    certificates = models.ManyToManyField(Certificate, blank=True)
+    </div>
 
-    def __str__(self):
-        return self.name
+    <div class="row">
+        <div class="col-xl-6 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        Top Templates
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Template</th>
+                                <th>Certificates</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in templates %}
+                            <tr>
+                                <td>{{ t.template_name }}</td>
+                                <td>{{ t.total }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2">No data</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
