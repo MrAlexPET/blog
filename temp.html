@@ -1,55 +1,27 @@
-<div class="row">
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Count
+from certificates.models import Certificate
 
-    <div class="col-xl-4 col-lg-5">
-        <div class="card shadow mb-4">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">
-                    Certificate Status
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="chart-pie pt-4">
-                    <canvas id="certStatusChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
 
-</div>
+def certificates_expiring_stats():
+    now = timezone.now()
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    var ctx = document.getElementById("certStatusChart");
-
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ["Active", "Expiring", "Expired", "Revoked"],
-            datasets: [{
-                data: [
-                    {{ active }},
-                    {{ expiring }},
-                    {{ expired }},
-                    {{ revoked }}
-                ],
-                backgroundColor: [
-                    "#1cc88a",
-                    "#f6c23e",
-                    "#e74a3b",
-                    "#858796"
-                ],
-                hoverBorderColor: "rgba(234, 236, 244, 1)",
-            }],
-        },
-        options: {
-            maintainAspectRatio: false,
-            cutoutPercentage: 80,
-            plugins: {
-                legend: {
-                    position: "bottom"
-                }
-            }
-        }
-    });
-});
-</script>
+    return {
+        "expired": Certificate.objects.filter(expires_at__lt=now).count(),
+        "days_0_7": Certificate.objects.filter(
+            expires_at__gte=now,
+            expires_at__lte=now + timedelta(days=7)
+        ).count(),
+        "days_8_30": Certificate.objects.filter(
+            expires_at__gt=now + timedelta(days=7),
+            expires_at__lte=now + timedelta(days=30)
+        ).count(),
+        "days_31_90": Certificate.objects.filter(
+            expires_at__gt=now + timedelta(days=30),
+            expires_at__lte=now + timedelta(days=90)
+        ).count(),
+        "days_90_plus": Certificate.objects.filter(
+            expires_at__gt=now + timedelta(days=90)
+        ).count(),
+    }
