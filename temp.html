@@ -1,1 +1,549 @@
-sss
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from django.contrib import messages
+from django.db.models import Q, Count
+from django.contrib.auth.decorators import login_required
+from datetime import timedelta
+from .models import Certificate
+from certificates.services.adcs import sync_certificates
+
+
+def apply_filters(certificates, request):
+    """Применяет фильтры поиска и фильтрации к queryset"""
+    search = request.GET.get("search")
+    template = request.GET.get("template")
+    status = request.GET.get("status")
+    now = timezone.now()
+
+    if search:
+        certificates = certificates.filter(
+            Q(common_name__icontains=search) |
+            Q(serial_number__icontains=search) |
+            Q(san__icontains=search)
+        )
+
+    if template:
+        certificates = certificates.filter(template_name=template)
+
+    if status == "active":
+        certificates = certificates.filter(expires_at__gt=now, revoked=False)
+    elif status == "expiring":
+        certificates = certificates.filter(
+            expires_at__gt=now,
+            expires_at__lte=now + timedelta(days=30),
+            revoked=False
+        )
+    elif status == "expired":
+        certificates = certificates.filter(expires_at__lt=now)
+    elif status == "revoked":
+        certificates = certificates.filter(revoked=True)
+
+    return certificates
+
+
+@login_required
+def certificate_list(request):
+    certificates = Certificate.objects.all().order_by('expires_at')
+
+    search = request.GET.get("search")
+    template = request.GET.get("template")
+    status = request.GET.get("status")
+
+    if search:
+        certificates = certificates.filter(
+            Q(common_name__icontains=search) |
+            Q(serial_number__icontains=search) |
+            Q(san__icontains=search)
+        )
+
+    if template:
+        certificates = certificates.filter(template_name=template)
+
+    now = timezone.now()
+
+    if status == "active":
+        certificates = certificates.filter(expires_at__gt=now, revoked=False)
+
+    elif status == "expiring":
+        certificates = certificates.filter(
+            expires_at__gt=now,
+            expires_at__lte=now + timezone.timedelta(days=30),
+            revoked=False
+        )
+
+    elif status == "expired":
+        certificates = certificates.filter(expires_at__lt=now)
+
+    elif status == "revoked":
+        certificates = certificates.filter(revoked=True)
+
+    templates = Certificate.objects.values_list(
+        "template_name", flat=True
+    ).distinct()
+
+    return render(request, "certificates/list.html", {
+        "certificates": certificates,
+        "templates": templates
+    })
+
+
+@login_required
+def dashboard(request):
+    now = timezone.now()
+
+    total = Certificate.objects.count()
+    active = Certificate.objects.filter(
+        revoked=False,
+        expires_at__gt=now
+    ).count()
+    print(active)
+
+    expiring = Certificate.objects.filter(
+        revoked=False,
+        expires_at__gt=now,
+        expires_at__lte=now + timezone.timedelta(days=30)
+    ).count()
+
+    expired = Certificate.objects.filter(
+        expires_at__lte=now
+    ).count()
+
+    revoked = Certificate.objects.filter(revoked=True).count()
+
+    templates = (
+        Certificate.objects
+        .values("template_name")
+        .annotate(total=Count("id"))
+        .order_by("-total")[:5]
+    )
+
+    stats = certificates_expiring_stats()
+
+    context = {
+        "total": total,
+        "active": active,
+        "expiring": expiring,
+        "expired": expired,
+        "revoked": revoked,
+        "templates": templates,
+        "stats": stats,
+    }
+
+    return render(request, "certificates/dashboard.html", context)
+
+
+def certificates_expiring_stats():
+    now = timezone.now()
+
+    qs = Certificate.objects.filter(revoked=False)
+
+    return {
+        "expired": qs.filter(expires_at__lt=now).count(),
+        "days_0_7": qs.filter(
+            expires_at__gte=now,
+            expires_at__lte=now + timedelta(days=7)
+        ).count(),
+        "days_8_30": qs.filter(
+            expires_at__gt=now + timedelta(days=7),
+            expires_at__lte=now + timedelta(days=30)
+        ).count(),
+        "days_31_90": qs.filter(
+            expires_at__gt=now + timedelta(days=30),
+            expires_at__lte=now + timedelta(days=90)
+        ).count(),
+        "days_90_plus": qs.filter(
+            expires_at__gt=now + timedelta(days=90)
+        ).count(),
+    }
+
+
+@login_required
+def certificates_active(request):
+    now = timezone.now()
+    base_qs = Certificate.objects.filter(revoked=False, expires_at__gt=now)
+    filtered_qs = apply_filters(base_qs, request)
+
+    templates = Certificate.objects.values_list("template_name", flat=True).distinct()
+
+    return render(request, "certificates/list.html", {
+        "certificates": filtered_qs,
+        "templates": templates,
+        "title": "Active certificates",
+        "search": request.GET.get("search", ""),
+        "selected_template": request.GET.get("template", ""),
+        "selected_status": request.GET.get("status", ""),
+    })
+
+
+@login_required
+def certificates_expiring(request):
+    now = timezone.now()
+    base_qs = Certificate.objects.filter(
+        revoked=False,
+        expires_at__gt=now,
+        expires_at__lte=now + timedelta(days=30)
+    )
+    filtered_qs = apply_filters(base_qs, request)
+
+    templates = Certificate.objects.values_list("template_name", flat=True).distinct()
+
+    return render(request, "certificates/list.html", {
+        "certificates": filtered_qs,
+        "templates": templates,
+        "title": "Expiring soon",
+        "search": request.GET.get("search", ""),
+        "selected_template": request.GET.get("template", ""),
+        "selected_status": request.GET.get("status", ""),
+    })
+
+
+@login_required
+def certificates_expired(request):
+    now = timezone.now()
+    base_qs = Certificate.objects.filter(expires_at__lte=now)
+    filtered_qs = apply_filters(base_qs, request)
+
+    templates = Certificate.objects.values_list("template_name", flat=True).distinct()
+
+    return render(request, "certificates/list.html", {
+        "certificates": filtered_qs,
+        "templates": templates,
+        "title": "Expired certificates",
+        "search": request.GET.get("search", ""),
+        "selected_template": request.GET.get("template", ""),
+        "selected_status": request.GET.get("status", ""),
+    })
+
+
+@login_required
+def certificates_revoked(request):
+    base_qs = Certificate.objects.filter(revoked=True)
+    filtered_qs = apply_filters(base_qs, request)
+
+    templates = Certificate.objects.values_list("template_name", flat=True).distinct()
+
+    return render(request, "certificates/list.html", {
+        "certificates": filtered_qs,
+        "templates": templates,
+        "title": "Revoked certificates",
+        "search": request.GET.get("search", ""),
+        "selected_template": request.GET.get("template", ""),
+        "selected_status": request.GET.get("status", ""),
+    })
+
+
+@login_required
+def sync_certificates_views(request):
+    if request.method == "POST":
+        sync_certificates()
+        messages.success(request, "Certificates successfully synced from AD CS")
+
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
+
+@login_required
+def certificate_detail(request, serial):
+    cert = get_object_or_404(Certificate, serial_number=serial)
+    return render(request, 'certificates/detail.html', {'cert': cert})
+
+
+@login_required
+def templates_list(request):
+    templates = (
+        Certificate.objects
+        .values("template_name")
+        .annotate(total=Count("id"))
+        .order_by("template_name")
+    )
+
+    return render(
+        request,
+        "certificates/groups/templates_list.html",
+        {"templates": templates},
+    )
+
+
+@login_required
+def certificates_by_template(request, template_name):
+    base_qs = Certificate.objects.filter(template_name=template_name)
+
+    filtered_qs = apply_filters(base_qs, request)
+
+    templates = Certificate.objects.values_list("template_name", flat=True).distinct()
+
+    return render(
+        request,
+        "certificates/list.html",
+        {
+            "certificates": filtered_qs,
+            "templates": templates,
+            "current_template": template_name,
+            "search": request.GET.get("search", ""),
+            "selected_template": request.GET.get("template", ""),
+            "selected_status": request.GET.get("status", ""),
+        },
+    )
+
+
+@login_required
+def vms_list(request):
+    vms = (
+        Certificate.objects
+        .exclude(vm="")
+        .values("vm")
+        .annotate(total=Count("id"))
+        .order_by("vm")
+    )
+
+    return render(
+        request,
+        "certificates/groups/vms_list.html",
+        {"vms": vms}
+    )
+
+
+@login_required
+def certificates_by_vm(request, vm_name):
+    base_qs = Certificate.objects.filter(vm=vm_name)
+
+    filtered_qs = apply_filters(base_qs, request)
+
+    templates = Certificate.objects.values_list("template_name", flat=True).distinct()
+
+    return render(
+        request,
+        "certificates/list.html",
+        {
+            "certificates": filtered_qs,
+            "templates": templates,
+            "current_vm": vm_name,
+            "search": request.GET.get("search", ""),
+            "selected_template": request.GET.get("template", ""),
+            "selected_status": request.GET.get("status", ""),
+        },
+    )
+
+
+
+
+
+from django.urls import path
+from . import views
+
+
+urlpatterns = [
+    path('', views.dashboard, name='dashboard'),
+
+    path('certificates/', views.certificate_list, name='certificate_list'),
+    path('certificates/active/', views.certificates_active, name='cert_active'),
+    path('certificates/expiring/', views.certificates_expiring, name='cert_expiring'),
+    path('certificates/expired/', views.certificates_expired, name='cert_expired'),
+    path('certificates/revoked/', views.certificates_revoked, name='cert_revoked'),
+
+    path('certificates/sync/', views.sync_certificates_views, name='cert_sync'),
+
+    path('certificates/<str:serial>/', views.certificate_detail, name='certificate_detail'),
+
+    path('groups/templates/', views.templates_list, name='template_list'),
+    path(
+        'groups/templates/<str:template_name>/',
+        views.certificates_by_template,
+        name='certificates_by_template'
+    ),
+
+    path('groups/vms/', views.vms_list, name='vms_list'),
+    path(
+        'groups/vms/<str:vm_name>/',
+        views.certificates_by_vm,
+        name='certificates_by_vm'
+    ),
+]
+
+
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Заголовок с иконкой -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <div class="icon-circle bg-primary mr-3 shadow-sm">
+                <i class="fas fa-certificate text-white"></i>
+            </div>
+            <h1 class="h3 text-gray-800 font-weight-bold mb-0">Certificates</h1>
+        </div>
+        <span class="badge badge-secondary badge-pill px-3 py-2">
+            {{ certificates|length }} {{ certificates|length|pluralize:"item,items" }}
+        </span>
+    </div>
+
+    <!-- Фильтры -->
+    <div class="card shadow-sm border-0 mb-4 rounded-lg">
+        <div class="card-body p-4">
+            <form method="get" class="row g-3">
+                <!-- Поиск -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-light">
+                                <i class="fas fa-search text-gray-600"></i>
+                            </span>
+                        </div>
+                        <input
+                            type="text"
+                            name="search"
+                            class="form-control"
+                            placeholder="Search CN, SAN, Serial..."
+                            value="{{ request.GET.search }}"
+                        >
+                    </div>
+                </div>
+
+                <!-- Template -->
+                <div class="col-lg-3 col-md-6">
+                    <select name="template" class="form-control">
+                        <option value="">All templates</option>
+                        {% for t in templates %}
+                            <option value="{{ t }}" {% if selected_template == t %}selected{% endif %}>
+                                {{ t }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Status -->
+                <div class="col-lg-3 col-md-6">
+                    <select name="status" class="form-control">
+                        <option value="">All statuses</option>
+                        <option value="active" {% if selected_status == "active" %}selected{% endif %}>Active</option>
+                        <option value="expiring" {% if selected_status == "expiring" %}selected{% endif %}>Expiring Soon</option>
+                        <option value="expired" {% if selected_status == "expired" %}selected{% endif %}>Expired</option>
+                        <option value="revoked" {% if selected_status == "revoked" %}selected{% endif %}>Revoked</option>
+                    </select>
+                </div>
+
+                <!-- Кнопка -->
+                <div class="col-lg-2 col-md-6 d-flex">
+                    <button type="submit" class="btn btn-primary btn-block shadow-sm">
+                        <i class="fas fa-filter mr-1"></i> Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Карточка с таблицей -->
+    <div class="card shadow-sm border-0 rounded-lg">
+        <div class="card-header bg-gradient-light py-3 border-0 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-list mr-2"></i>Issued Certificates
+            </h6>
+            <form method="post" action="{% url 'cert_sync' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-primary btn-sm px-3">
+                    <i class="fas fa-sync mr-1"></i>Update
+                </button>
+            </form>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive rounded">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light text-gray-700">
+                        <tr>
+                            <th>Common Name</th>
+                            <th>Template</th>
+                            <th>SAN</th>
+                            <th>Issued</th>
+                            <th>Expires</th>
+                            <th>Days Left</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cert in certificates %}
+                        <tr class="border-bottom hover-shadow-sm" style="transition: all 0.2s;">
+                            <td class="pl-4 py-3">
+                                <a href="{% url 'certificate_detail' serial=cert.serial_number %}"
+                                   class="font-weight-medium text-decoration-none text-gray-800">
+                                    {{ cert.common_name }}
+                                </a>
+                            </td>
+                            <td>{{ cert.template_name }}</td>
+                            <td class="text-muted small" style="max-width: 250px; word-wrap: break-word;">
+                                {{ cert.san|default:"—" }}
+                            </td>
+                            <td>{{ cert.issued_at|date:"Y-m-d" }}</td>
+                            <td>{{ cert.expires_at|date:"Y-m-d" }}</td>
+                            <td>
+                                {% if cert.is_expired %}
+                                    <span class="badge badge-danger px-2 py-1">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>Expired
+                                    </span>
+                                {% elif cert.is_expiring_soon %}
+                                    <span class="badge badge-warning px-2 py-1 text-dark">
+                                        <i class="fas fa-clock mr-1"></i>{{ cert.days_left }} days
+                                    </span>
+                                {% else %}
+                                    <span class="text-success font-weight-bold">{{ cert.days_left }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fas fa-certificate fa-2x mb-2 text-gray-300"></i>
+                                <p class="mb-0 font-italic">No certificates match the criteria</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подсказка -->
+    <div class="text-center mt-3">
+        <small class="text-muted">
+            <i class="fas fa-info-circle mr-1"></i>
+            Click on a certificate to view details
+        </small>
+    </div>
+</div>
+
+<!-- Подключение иконок -->
+<link rel="stylesheet" href="{% static 'vendor/fontawesome-free/css/all.min.css' %}">
+
+<!-- Локальные стили -->
+<style>
+    .bg-gradient-light {
+        background: linear-gradient(180deg, #f8f9fc 10%, #eef1f5 100%);
+        border-bottom: 1px solid #e3e6f0;
+    }
+    .hover-shadow-sm:hover {
+        background-color: #f8f9fc !important;
+        box-shadow: 0 0.15rem 0.75rem rgba(58, 59, 69, 0.1) !important;
+    }
+    .icon-circle {
+        height: 40px;
+        width: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        background: #4e73df;
+    }
+    .form-control:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    .table td, .table th {
+        vertical-align: middle;
+        font-size: 0.95rem;
+    }
+</style>
+{% endblock %}
+          
