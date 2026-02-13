@@ -1,23 +1,29 @@
 {% if page_obj.has_other_pages %}
-<nav>
+<nav class="mt-4">
   <ul class="pagination justify-content-center">
 
     {# Previous #}
     {% if page_obj.has_previous %}
       <li class="page-item">
         <a class="page-link"
-           href="?page={{ page_obj.previous_page_number }}{{ request.GET.urlencode|cut:'page='|yesno:'&,' }}">
-           &laquo;
+           href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ page_obj.previous_page_number }}">
+          &laquo;
         </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">&laquo;</span>
       </li>
     {% endif %}
 
+
     {% with total=page_obj.paginator.num_pages current=page_obj.number %}
 
-      {# Always show first page #}
+      {# Первая страница #}
       {% if current > 3 %}
         <li class="page-item">
-          <a class="page-link" href="?page=1&{{ request.GET.urlencode|cut:'page=' }}">
+          <a class="page-link"
+             href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page=1">
             1
           </a>
         </li>
@@ -29,25 +35,27 @@
         {% endif %}
       {% endif %}
 
-      {# Pages around current #}
+
+      {# Страницы вокруг текущей #}
       {% for num in page_obj.paginator.page_range %}
         {% if num >= current|add:-2 and num <= current|add:2 %}
-          {% if page_obj.number == num %}
+          {% if num == current %}
             <li class="page-item active">
               <span class="page-link">{{ num }}</span>
             </li>
           {% else %}
             <li class="page-item">
               <a class="page-link"
-                 href="?page={{ num }}&{{ request.GET.urlencode|cut:'page=' }}">
-                 {{ num }}
+                 href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ num }}">
+                {{ num }}
               </a>
             </li>
           {% endif %}
         {% endif %}
       {% endfor %}
 
-      {# Always show last page #}
+
+      {# Последняя страница #}
       {% if current < total|add:-2 %}
         {% if current < total|add:-3 %}
           <li class="page-item disabled">
@@ -57,21 +65,26 @@
 
         <li class="page-item">
           <a class="page-link"
-             href="?page={{ total }}&{{ request.GET.urlencode|cut:'page=' }}">
-             {{ total }}
+             href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ total }}">
+            {{ total }}
           </a>
         </li>
       {% endif %}
 
     {% endwith %}
 
+
     {# Next #}
     {% if page_obj.has_next %}
       <li class="page-item">
         <a class="page-link"
-           href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode|cut:'page=' }}">
-           &raquo;
+           href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ page_obj.next_page_number }}">
+          &raquo;
         </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">&raquo;</span>
       </li>
     {% endif %}
 
