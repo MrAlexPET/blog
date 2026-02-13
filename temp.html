@@ -1,93 +1,86 @@
-{% if page_obj.has_other_pages %}
-<nav class="mt-4">
-  <ul class="pagination justify-content-center">
+<!-- Sidebar -->
+    <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
-    {# Previous #}
-    {% if page_obj.has_previous %}
-      <li class="page-item">
-        <a class="page-link"
-           href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ page_obj.previous_page_number }}">
-          &laquo;
+        <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{% url 'dashboard' %}">
+            <div class="sidebar-brand-icon rotate-n-15">
+                <i class="fas fa-laugh-wink"></i>
+            </div>
+            <div class="sidebar-brand-text mx-3">Certification Center</div>
         </a>
-      </li>
-    {% else %}
-      <li class="page-item disabled">
-        <span class="page-link">&laquo;</span>
-      </li>
-    {% endif %}
 
+        <hr class="sidebar-divider my-0">
 
-    {% with total=page_obj.paginator.num_pages current=page_obj.number %}
-
-      {# Первая страница #}
-      {% if current > 3 %}
-        <li class="page-item">
-          <a class="page-link"
-             href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page=1">
-            1
-          </a>
+        <li class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <a class="nav-link" href="{% url 'dashboard' %}">
+                <i class="fas fa-fw fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+            </a>
         </li>
 
-        {% if current > 4 %}
-          <li class="page-item disabled">
-            <span class="page-link">…</span>
-          </li>
-        {% endif %}
-      {% endif %}
+        <hr class="sidebar-divider">
 
+        <div class="sidebar-heading">
+            Certificates
+        </div>
 
-      {# Страницы вокруг текущей #}
-      {% for num in page_obj.paginator.page_range %}
-        {% if num >= current|add:-2 and num <= current|add:2 %}
-          {% if num == current %}
-            <li class="page-item active">
-              <span class="page-link">{{ num }}</span>
-            </li>
-          {% else %}
-            <li class="page-item">
-              <a class="page-link"
-                 href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ num }}">
-                {{ num }}
-              </a>
-            </li>
-          {% endif %}
-        {% endif %}
-      {% endfor %}
-
-
-      {# Последняя страница #}
-      {% if current < total|add:-2 %}
-        {% if current < total|add:-3 %}
-          <li class="page-item disabled">
-            <span class="page-link">…</span>
-          </li>
-        {% endif %}
-
-        <li class="page-item">
-          <a class="page-link"
-             href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ total }}">
-            {{ total }}
-          </a>
+        <li class="nav-item {% if request.resolver_match.url_name == 'certificate_list' or request.resolver_match.url_name == 'cert_active' or request.resolver_match.url_name == 'cert_expiring' or request.resolver_match.url_name == 'cert_expired' or request.resolver_match.url_name == 'cert_revoked' %}active{% endif %}">
+            <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseCertificates"
+               aria-expanded="true" aria-controls="collapseCertificates">
+                <i class="fas fa-fw fa-certificate"></i>
+                <span>Certificates</span>
+            </a>
+            <div id="collapseCertificates" class="collapse" aria-labelledby="headingCertificates" data-parent="#accordionSidebar">
+                <div class="bg-white py-2 collapse-inner rounded">
+                    <h6 class="collapse-header">Certificate Filters:</h6>
+                    <a class="collapse-item" href="{% url 'certificate_list' %}">All</a>
+                    <a class="collapse-item" href="{% url 'cert_active' %}">Active</a>
+                    <a class="collapse-item" href="{% url 'cert_expiring' %}">Expiring</a>
+                    <a class="collapse-item" href="{% url 'cert_expired' %}">Expired</a>
+                    <a class="collapse-item" href="{% url 'cert_revoked' %}">Revoked</a>
+                </div>
+            </div>
         </li>
-      {% endif %}
 
-    {% endwith %}
+        <hr class="sidebar-divider">
 
+        <div class="sidebar-heading">
+            Management
+        </div>
 
-    {# Next #}
-    {% if page_obj.has_next %}
-      <li class="page-item">
-        <a class="page-link"
-           href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ page_obj.next_page_number }}">
-          &raquo;
-        </a>
-      </li>
-    {% else %}
-      <li class="page-item disabled">
-        <span class="page-link">&raquo;</span>
-      </li>
-    {% endif %}
+        <li class="nav-item {% if request.resolver_match.url_name == 'template_list' or request.resolver_match.url_name == 'vms_list' %}active{% endif %}">
+            <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseGroups"
+               aria-expanded="true" aria-controls="collapseGroups">
+                <i class="fas fa-fw fa-layer-group"></i>
+                <span>Groups</span>
+            </a>
+            <div id="collapseGroups" class="collapse" aria-labelledby="headingGroups" data-parent="#accordionSidebar">
+                <div class="bg-white py-2 collapse-inner rounded">
+                    <h6 class="collapse-header">Group Filters:</h6>
+                    <a class="collapse-item" href="{% url 'template_list' %}">Templates</a>
+                    <a class="collapse-item" href="{% url 'vms_list' %}">VMs</a>
+                </div>
+            </div>
+        </li>
 
-  </ul>
-</nav>
-{% endif %}
+        <li class="nav-item">
+            <a class="nav-link disabled" href="#">
+                <i class="fas fa-fw fa-ban"></i>
+                <span>Revoked</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link disabled" href="#">
+                <i class="fas fa-fw fa-chart-area"></i>
+                <span>Statistics</span>
+            </a>
+        </li>
+
+        <hr class="sidebar-divider d-none d-md-block">
+
+        <div class="text-center d-none d-md-inline">
+            <button class="rounded-circle border-0" id="sidebarToggle"></button>
+        </div>
+
+    </ul>
+    <!-- End of Sidebar -->
