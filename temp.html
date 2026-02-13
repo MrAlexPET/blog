@@ -2,35 +2,75 @@
 <nav>
   <ul class="pagination justify-content-center">
 
+    {# Previous #}
     {% if page_obj.has_previous %}
       <li class="page-item">
         <a class="page-link"
-           href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.template %}&template={{ request.GET.template }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
-           Previous
+           href="?page={{ page_obj.previous_page_number }}{{ request.GET.urlencode|cut:'page='|yesno:'&,' }}">
+           &laquo;
         </a>
       </li>
     {% endif %}
 
-    {% for num in page_obj.paginator.page_range %}
-      {% if page_obj.number == num %}
-        <li class="page-item active">
-          <span class="page-link">{{ num }}</span>
+    {% with total=page_obj.paginator.num_pages current=page_obj.number %}
+
+      {# Always show first page #}
+      {% if current > 3 %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1&{{ request.GET.urlencode|cut:'page=' }}">
+            1
+          </a>
         </li>
-      {% else %}
+
+        {% if current > 4 %}
+          <li class="page-item disabled">
+            <span class="page-link">…</span>
+          </li>
+        {% endif %}
+      {% endif %}
+
+      {# Pages around current #}
+      {% for num in page_obj.paginator.page_range %}
+        {% if num >= current|add:-2 and num <= current|add:2 %}
+          {% if page_obj.number == num %}
+            <li class="page-item active">
+              <span class="page-link">{{ num }}</span>
+            </li>
+          {% else %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?page={{ num }}&{{ request.GET.urlencode|cut:'page=' }}">
+                 {{ num }}
+              </a>
+            </li>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+
+      {# Always show last page #}
+      {% if current < total|add:-2 %}
+        {% if current < total|add:-3 %}
+          <li class="page-item disabled">
+            <span class="page-link">…</span>
+          </li>
+        {% endif %}
+
         <li class="page-item">
           <a class="page-link"
-             href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.template %}&template={{ request.GET.template }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
-             {{ num }}
+             href="?page={{ total }}&{{ request.GET.urlencode|cut:'page=' }}">
+             {{ total }}
           </a>
         </li>
       {% endif %}
-    {% endfor %}
 
+    {% endwith %}
+
+    {# Next #}
     {% if page_obj.has_next %}
       <li class="page-item">
         <a class="page-link"
-           href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.template %}&template={{ request.GET.template }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
-           Next
+           href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode|cut:'page=' }}">
+           &raquo;
         </a>
       </li>
     {% endif %}
@@ -38,4 +78,3 @@
   </ul>
 </nav>
 {% endif %}
-
