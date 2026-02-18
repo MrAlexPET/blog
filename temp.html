@@ -28,9 +28,9 @@ MIN_BUF_FOR_RESYNC = 512 * 1024
 
 STAT_EVERY_SEC = 60
 
-# Якорь начала записи под ваш формат:
-# \n2026-02-18 14:20:41.764 MSK,
-ANCHOR_RE = re.compile(br"(?:^|\n)(20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} MSK,)")
+# Якорь начала записи под ваш формат (делаем строгим: MSK," далее user_name в кавычках):
+# 2026-02-18 14:20:41.764 MSK,"postgres",...
+ANCHOR_RE = re.compile(br"(?:^|\n)(20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} MSK,\")")
 # ----------------------------------------
 
 BASE_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
@@ -111,7 +111,6 @@ def normalize_event(row):
     cmd = d.get("command_tag", "pg") or "pg"
     msgid = ("pg_" + cmd).lower()
 
-    # у вас SQL лежит в message; query обычно пустое
     arg = extract_argument_from_message(d.get("message", ""))
 
     payload = {
@@ -148,11 +147,9 @@ def send_syslog_tcp_rfc6587(sock, payload_obj: dict, msgid: str, severity_name: 
     sock.sendall(frame)
 
 def looks_ok_row(row) -> bool:
-    # мягкая, но полезная валидация, чтобы не слать мусор при рассинхроне
     if not row or len(row) < 4:
         return False
     lt = row[0] or ""
-    # lt вида "2026-02-18 14:20:41.764 MSK"
     if not (len(lt) >= 23 and lt[0:4].isdigit() and lt[4] == "-" and lt[7] == "-"):
         return False
     pid = row[3] or ""
@@ -162,17 +159,33 @@ def looks_ok_row(row) -> bool:
 
 def resync_to_anchor(buf: bytes):
     """
-    Сдвинуть буфер к следующему якорю начала записи.
-    Возвращает (new_buf, dropped_bytes). Если якоря нет — выкидывает часть буфера.
+    Ресинк: сдвинуть буфер к СЛЕДУЮЩЕМУ началу записи.
+    Гарантируем прогресс: dropped > 0 если buf не пустой.
     """
+    if not buf:
+        return buf, 0
+
     m = ANCHOR_RE.search(buf)
     if not m:
         drop = min(len(buf), 1024 * 1024)
+        # гарантируем >0
+        drop = max(1, drop)
         return buf[drop:], drop
 
-    # m.start(1) указывает на начало '2026-...'
-    pos = m.start(1)
-    return buf[pos:], pos
+    pos = m.start(1)  # начало "2026-..."
+    if pos > 0:
+        return buf[pos:], pos
+
+    # pos == 0 => якорь уже в начале, но запись "плохая".
+    # Значит надо искать СЛЕДУЮЩИЙ якорь, иначе зациклимся.
+    m2 = ANCHOR_RE.search(buf, 1)
+    if m2:
+        pos2 = m2.start(1)
+        if pos2 > 0:
+            return buf[pos2:], pos2
+
+    # следующего якоря в буфере нет — сдвигаемся хотя бы на 1 байт
+    return buf[1:], 1
 
 def follow():
     tcp_sock = None
@@ -190,17 +203,15 @@ def follow():
     log(f"start path={path} offset={offset}")
 
     while True:
-        # смена файла по дате
         new_path = current_log_file()
         if new_path != path:
             path = new_path
-            offset = load_state(path)  # новый файл -> 0
+            offset = load_state(path)
             buf = b""
             last_offset_seen = offset
             last_progress = time.time()
             log(f"switched to new log file: path={path} offset={offset}")
 
-        # connect/reconnect
         if tcp_sock is None:
             try:
                 tcp_sock = tcp_connect()
@@ -216,7 +227,6 @@ def follow():
             continue
 
         try:
-            # truncate/пересоздание файла
             try:
                 size = os.path.getsize(path)
                 if size < offset:
@@ -227,7 +237,6 @@ def follow():
             except Exception:
                 pass
 
-            # читаем прирост
             with open(path, "rb") as fb:
                 fb.seek(offset)
                 chunk = fb.read(CHUNK_SIZE)
@@ -237,7 +246,6 @@ def follow():
             else:
                 buf += chunk
 
-            # парсим записи, сколько получится
             while True:
                 if not buf:
                     break
@@ -249,7 +257,7 @@ def follow():
                 try:
                     row = next(reader)
                 except StopIteration:
-                    # данных недостаточно для целой записи (например, запись многострочная и не дописана)
+                    # не хватает данных для целой CSV-записи (нормально для хвоста многострочного query)
                     break
                 except Exception as e:
                     old = len(buf)
@@ -260,11 +268,16 @@ def follow():
                     log(f"resync(parse-error): dropped={dropped} buf={old}->{len(buf)} err={e}")
                     continue
 
-                consumed = bio.tell()  # сколько байт реально съедено из buf
+                consumed = bio.tell()
                 if consumed <= 0:
                     break
 
                 if not looks_ok_row(row):
+                    # ВАЖНО: если csv.reader "съел" весь буфер, то это часто означает,
+                    # что запись просто НЕ дописана (мы на хвосте файла). Ждём продолжение.
+                    if consumed >= len(buf):
+                        break
+
                     old = len(buf)
                     buf, dropped = resync_to_anchor(buf)
                     offset += dropped
@@ -273,7 +286,6 @@ def follow():
                     log(f"resync(bad-row): dropped={dropped} buf={old}->{len(buf)} row0={row[0] if row else None!r}")
                     continue
 
-                # отправка
                 try:
                     payload_obj, msgid, sevname = normalize_event(row)
                     send_syslog_tcp_rfc6587(tcp_sock, payload_obj, msgid, sevname)
@@ -284,10 +296,8 @@ def follow():
                     except Exception:
                         pass
                     tcp_sock = None
-                    # запись не коммитим
                     break
                 except Exception as e:
-                    # пропускаем именно эту запись (но корректно сдвигаем consumed)
                     buf = buf[consumed:]
                     offset += consumed
                     save_state(path, offset)
@@ -304,7 +314,6 @@ def follow():
                     last_offset_seen = offset
                     last_progress = time.time()
 
-            # анти-залипание: долго нет прогресса и буфер уже большой => значит битая запись/рассинхрон
             if (time.time() - last_progress) > NO_PROGRESS_SEC and len(buf) > MIN_BUF_FOR_RESYNC:
                 old = len(buf)
                 buf, dropped = resync_to_anchor(buf)
