@@ -1,19 +1,11 @@
- sudo ls -l /etc/systemd/system/pglog-cleanup.service
--rw-r--r-- 1 root root 206 фев 18 11:21 /etc/systemd/system/pglog-cleanup.service
-root@db2-prod:/opt/log/pgpro/ent-16/pg_log# sudo systemctl cat pglog-cleanup.service
-# Unit pglog-cleanup.service could not be loaded.
-root@db2-prod:/opt/log/pgpro/ent-16/pg_log# sudo systemctl status pglog-cleanup.service --no-pager -l
-● pglog-cleanup.service - Delete yesterday PostgreSQL csv logs
-   Loaded: bad-setting (Reason: Unit pglog-cleanup.service has a bad unit file setting.)
-   Active: inactive (dead)
+sudo tee /usr/local/sbin/pglog-cleanup.sh >/dev/null <<'EOF'
+#!/bin/bash
+set -euo pipefail
 
-фев 18 11:19:53 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:19:58 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:21:13 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:21:18 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:22:28 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:22:28 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:22:28 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:22:28 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:22:28 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
-фев 18 11:22:36 db2-prod systemd[1]: /etc/systemd/system/pglog-cleanup.service:6: Failed to resolve unit specifiers in d=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*: Unknown error -57
+LOGDIR="/opt/log/pgpro/ent-16/pg_log"
+d="$(date -d 'yesterday' +%F)"
+
+rm -f "${LOGDIR}/postgresql-${d}.csv"* || true
+EOF
+
+sudo chmod 0755 /usr/local/sbin/pglog-cleanup.sh
