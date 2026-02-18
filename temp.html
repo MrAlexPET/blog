@@ -1,1 +1,21 @@
-sss
+sudo systemctl status pg-csv-to-siem --no-pager -l
+● pg-csv-to-siem.service - Forward PostgreSQL csvlog to SIEM (RFC5424 JSON over UDP)
+   Loaded: loaded (/etc/systemd/system/pg-csv-to-siem.service; enabled; vendor preset: enabled)
+   Active: active (running) since Wed 2026-02-18 14:25:46 MSK; 44min ago
+ Main PID: 16040 (python3)
+    Tasks: 1 (limit: 4915)
+   Memory: 8.4M
+      CPU: 3min 25.001s
+   CGroup: /system.slice/pg-csv-to-siem.service
+           └─16040 /usr/bin/python3 /opt/pg_csv_to_siem.py
+
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
+фев 18 15:10:26 db1-prod python3[16040]: 2026-02-18T15:10:26+03:00 resync(bad-row): dropped=0 buf=29->29 row0='2026-02-18 15:04:18.714 MSK'
