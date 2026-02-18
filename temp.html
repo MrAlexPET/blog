@@ -1,36 +1,20 @@
-1. Создаем сервис:
+enable --now pglog-cleanup.timer
+Created symlink /etc/systemd/system/timers.target.wants/pglog-cleanup.timer → /etc/systemd/system/pglog-cleanup.timer.
+Job for pglog-cleanup.timer failed.
+See "systemctl status pglog-cleanup.timer" and "journalctl -xe" for details.
+root@db2-prod:/opt/log/pgpro/ent-16/pg_log# sudo systemctl status pglog-cleanup.timer --no-paper -l
+systemctl: нераспознанный параметр «--no-paper»
+root@db2-prod:/opt/log/pgpro/ent-16/pg_log# sudo systemctl status pglog-cleanup.timer --no-pager -l
+● pglog-cleanup.timer - Run pglog cleanup daily at 01:00
+   Loaded: loaded (/etc/systemd/system/pglog-cleanup.timer; enabled; vendor preset: enabled)
+   Active: inactive (dead)
+  Trigger: n/a
 
-sudo tee /etc/systemd/system/1. pglog-cleanup.service >/dev/null <<'EOF'
-[Unit]
-Description=Delete yesterday PostgreSQL csv logs
-
-[Service]
-Type=oneshot
-User=postgres
-ExecStart=/bin/bash -lc 'd=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*'
-EOF
-
-2. Создаем таймер:
-
-sudo tee /etc/systemd/system/pglog-cleanup.timer >/dev/null <<'EOF'
-[Unit]
-Description=Run pglog cleanup daily at 01:00
-
-[Timer]
-OnCalendar=*-*-* 01:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-3. Включаем:
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now pglog-cleanup.timer
-systemctl list-timers --all | grep pglog-cleanup || true
-
-
-4. Проверка вручную:
-
-sudo systemctl start pglog-cleanup.service
+фев 18 10:59:46 db2-prod systemd[1]: pglog-cleanup.timer: Refusing to start, unit to trigger not loaded.
+фев 18 10:59:46 db2-prod systemd[1]: Failed to start Run pglog cleanup daily at 01:00.
+фев 18 11:19:58 db2-prod systemd[1]: pglog-cleanup.timer: Refusing to start, unit to trigger not loaded.
+фев 18 11:19:58 db2-prod systemd[1]: Failed to start Run pglog cleanup daily at 01:00.
+фев 18 11:21:18 db2-prod systemd[1]: pglog-cleanup.timer: Refusing to start, unit to trigger not loaded.
+фев 18 11:21:18 db2-prod systemd[1]: Failed to start Run pglog cleanup daily at 01:00.
+фев 18 11:22:36 db2-prod systemd[1]: pglog-cleanup.timer: Refusing to start, unit to trigger not loaded.
+фев 18 11:22:36 db2-prod systemd[1]: Failed to start Run pglog cleanup daily at 01:00.
