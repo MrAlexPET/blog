@@ -9,3 +9,29 @@ rm -f "${LOGDIR}/postgresql-${d}.csv"* || true
 EOF
 
 sudo chmod 0755 /usr/local/sbin/pglog-cleanup.sh
+
+
+sudo tee /etc/systemd/system/pglog-cleanup.service >/dev/null <<'EOF'
+[Unit]
+Description=Delete yesterday PostgreSQL csv logs
+
+[Service]
+Type=oneshot
+User=postgres
+ExecStart=/usr/local/sbin/pglog-cleanup.sh
+EOF
+
+
+
+
+sudo systemctl daemon-reload
+sudo systemctl reset-failed
+
+sudo systemctl start pglog-cleanup.service
+sudo systemctl status pglog-cleanup.service --no-pager -l
+
+
+
+sudo systemctl enable --now pglog-cleanup.timer
+sudo systemctl status pglog-cleanup.timer --no-pager -l
+systemctl list-timers --all | grep pglog-cleanup
