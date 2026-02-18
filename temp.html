@@ -1,3 +1,339 @@
-<134>1 2026-02-18T14:27:53.102+03:00 db1-prod PostgreSQLGeneralLog - pg_idle - {"src": "postgresql_csvlog", "ts": "2026-02-18 14:27:53.068 MSK", "user": "postgres", "db": "postgres", "client": "127.0.0.1:55536", "thread_id": "2845", "cmd": "idle", "argument": "SELECT pg_catalog.pg_postmaster_start_time(), CASE WHEN pg_catalog.pg_is_in_recovery() THEN 0 ELSE ('x' || pg_catalog.substr(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_lsn()), 1, 8))::bit(32)::int END, CASE WHEN pg_catalog.pg_is_in_recovery() THEN 0 ELSE pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_flush_lsn(), '0/0')::bigint END, pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_replay_lsn(), '0/0')::bigint, pg_catalog.pg_wal_lsn_diff(COALESCE(pg_catalog.pg_last_wal_receive_lsn(), '0/0'), '0/0')::bigint, pg_catalog.pg_is_in_recovery() AND pg_catalog.pg_is_wal_replay_paused(), pg_catalog.pg_last_xact_replay_timestamp(), (pg_catalog.pg_stat_get_wal_receiver()).status, pg_catalog.current_setting('restore_command'), pg_catalog.array_to_json(pg_catalog.array_agg(pg_catalog.row_to_json(ri))) FROM (SELECT (SELECT rolname FROM pg_catalog.pg_authid WHERE oid = usesysid) AS usename, application_name, client_addr, w.state, sync_state, sync_priority FROM pg_catalog.pg_stat_get_wal_senders() w, pg_catalog.pg_stat_get_activity(pid)) AS ri", "detail": null, "application_name": "Patroni restapi", "backend_type": "client backend", "forwarded_ts": "2026-02-18T14:27:53.102+03:00"}
+sudo tee /opt/pg_csv_to_siem.py >/dev/null <<'EOF'
+#!/usr/bin/env python3
+import os, csv, json, time, socket, sys, io, re
+from datetime import datetime
+from pathlib import Path
 
-    <134>1 2026-02-18T14:29:55.073+03:00 db1-prod PostgreSQLGeneralLog - pg_explain - {"src": "postgresql_csvlog", "ts": "2026-02-18 14:29:54.965 MSK", "user": "postgres", "db": "SUPA", "client": "10.181.19.35:42992", "thread_id": "16108", "cmd": "EXPLAIN", "argument": "explain (analyse, verbose, buffers) SELECT DISTINCT\nT1._Fld179682RRef,\nT1._Fld179683RRef,\nT2._Fld179145\nFROM _InfoRg179681 T1\nINNER JOIN _Reference178305 T2\nON (T1._Fld179682RRef = T2._IDRRef)\nINNER JOIN _Reference178290 T3\nON (T2._Fld179146RRef = T3._IDRRef)\nLEFT OUTER JOIN _Document178318 T4\nON (T3._Fld178676_TYPE = '\\\\010'::bytea AND T3._Fld178676_RTRef = '\\\\000\\\\002\\\\270\\\\216'::bytea AND T3._Fld178676_RRRef = T4._IDRRef) AND (T4._Fld1551 = CAST(0 AS NUMERIC))\nWHERE ((((T1._Fld1551 = CAST(0 AS NUMERIC))) AND (T2._Fld1551 = CAST(0 AS NUMERIC))) AND (T3._Fld1551 = CAST(0 AS NUMERIC))) AND (T1._Fld179684 = TRUE AND (T2._Marked = FALSE) AND (T3._Marked = FALSE) AND (COALESCE((T4._Fld178480RRef),'\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000'::bytea) IN ('\\\\206\\\\241\\\\000PV\\\\232\\\\261\\\\337\\\\021\\\\360\\\\242\\\\220\\\\230\\\\350\\\\207\\\\326'::bytea, '\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000\\\\000'::bytea)) AND (T3._Fld178677RRef IN ('\\\\250\\\\0277\\\\013f\\\\214\\\\037\\\\336F7\\\\013\\\\037\\\\351_\\\\226U'::bytea)) AND (T1._Fld179683RRef IN ('\\\\221\\\\035\\\\000\\\\025]\\\\001\\\\007\\\\001\\\\021\\\\356\\\\2234\\\\013p&/'::bytea, '\\\\223\\\\224\\\\000\\\\036h\\\\014\\\\274\\\\265\\\\021\\\\345\\\\332,\\\\206-\\\\357\\\\272'::bytea, '\\\\224\\\\001\\\\2406\\\\237\\\\303\\\\207\\\\032\\\\021\\\\347\\\\210\\\\001\\\\203\\\\036\\\\332\\\\231'::bytea, '\\\\224\\\\001\\\\2406\\\\237\\\\303\\\\207\\\\032\\\\021\\\\347\\\\207\\\\006JG\\\\344N'::bytea, '\\\\224\\\\001\\\\2406\\\\237\\\\303\\\\207\\\\032\\\\021\\\\347\\\\210\\\\000\\\\363\\\\263\\\\362\\\\027'::bytea, '\\\\224\\\\001\\\\2406\\\\237\\\\303\\\\207\\\\032\\\\021\\\\347\\\\210\\\\005\\\\343\\\\343\\\\001\\\\333'::bytea, '\\\\224\\\\001\\\\2406\\\\237\\\\303\\\\207\\\\032\\\\021\\\\347\\\\210\\\\001\\\\255\\\\226\\\\007\\\\034'::bytea)))\nORDER BY 2, 3", "detail": null, "application_name": null, "backend_type": "client backend", "forwarded_ts": "2026-02-18T14:29:55.073+03:00"}
+# ---------------- CONFIG ----------------
+LOG_DIR = "/opt/log/pgpro/ent-16/pg_log"
+LOG_BASENAME_TEMPLATE = "postgresql-%Y-%m-%d.csv.csv"
+POLL_SEC = 0.2
+CHUNK_SIZE = 256 * 1024
+
+SYSLOG_HOST = "10.181.18.24"
+SYSLOG_PORT = 616
+SOCKET_TIMEOUT_SEC = 10
+TCP_RECONNECT_DELAY_SEC = 2
+
+HOSTNAME = socket.gethostname()
+APP_NAME = "PostgreSQLGeneralLog"
+FACILITY = 16  # local0
+
+STATE_FILENAME = "postgresql-csv.offset"
+
+# анти-залипание
+MAX_BUFFER_BYTES = 32 * 1024 * 1024
+NO_PROGRESS_SEC = 30
+MIN_BUF_FOR_RESYNC = 512 * 1024
+
+STAT_EVERY_SEC = 60
+
+# Якорь начала записи под ваш формат:
+# \n2026-02-18 14:20:41.764 MSK,
+ANCHOR_RE = re.compile(br"(?:^|\n)(20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} MSK,)")
+# ----------------------------------------
+
+BASE_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+STATE_PATH = str(BASE_DIR / STATE_FILENAME)
+
+SEV_MAP = {
+    "DEBUG": 7, "DEBUG1": 7, "DEBUG2": 7, "DEBUG3": 7, "DEBUG4": 7, "DEBUG5": 7,
+    "INFO": 6, "NOTICE": 5, "LOG": 6,
+    "WARNING": 4, "ERROR": 3, "FATAL": 2, "PANIC": 0,
+}
+DEFAULT_SEVERITY = 6
+
+COLS = [
+    "log_time","user_name","database_name","process_id","connection_from",
+    "session_id","session_line_num","command_tag","session_start_time",
+    "virtual_transaction_id","transaction_id","error_severity","sql_state_code",
+    "message","detail","hint","internal_query","internal_query_pos","context",
+    "query","query_pos","location","application_name","backend_type","leader_pid",
+    "query_id"
+]
+
+def log(msg: str):
+    ts = datetime.now().astimezone().isoformat(timespec="seconds")
+    print(f"{ts} {msg}", flush=True)
+
+def current_log_file() -> str:
+    return os.path.join(LOG_DIR, datetime.now().strftime(LOG_BASENAME_TEMPLATE))
+
+def pri(severity: int) -> int:
+    return FACILITY * 8 + severity
+
+def rfc3339_now_local():
+    return datetime.now().astimezone().isoformat(timespec="milliseconds")
+
+def make_rfc5424(payload: str, severity: int, msgid: str):
+    return f"<{pri(severity)}>1 {rfc3339_now_local()} {HOSTNAME} {APP_NAME} - {msgid} - {payload}"
+
+def load_state(expected_path: str) -> int:
+    try:
+        with open(STATE_PATH, "r", encoding="utf-8") as f:
+            s = f.read().strip()
+        if not s:
+            return 0
+        path, off = s.split("|", 1)
+        if path != expected_path:
+            return 0
+        return int(off)
+    except FileNotFoundError:
+        return 0
+    except Exception:
+        return 0
+
+def save_state(path: str, off: int):
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    with open(STATE_PATH, "w", encoding="utf-8") as f:
+        f.write(f"{path}|{off}")
+
+def extract_argument_from_message(msg: str) -> str:
+    if not msg:
+        return ""
+    if msg.startswith("execute "):
+        p = msg.find(": ")
+        if p != -1:
+            return msg[p+2:]
+        return msg
+    if msg.startswith("statement: "):
+        return msg[len("statement: "):]
+    if msg.startswith("оператор: "):
+        return msg[len("оператор: "):]
+    return msg
+
+def normalize_event(row):
+    d = {}
+    for i, name in enumerate(COLS):
+        if i < len(row) and row[i] != "":
+            d[name] = row[i]
+
+    cmd = d.get("command_tag", "pg") or "pg"
+    msgid = ("pg_" + cmd).lower()
+
+    # у вас SQL лежит в message; query обычно пустое
+    arg = extract_argument_from_message(d.get("message", ""))
+
+    payload = {
+        "src": "postgresql_csvlog",
+        "ts": d.get("log_time"),
+        "user": d.get("user_name"),
+        "db": d.get("database_name"),
+        "client": d.get("connection_from"),
+        "thread_id": d.get("process_id"),
+        "cmd": cmd,
+        "argument": arg,
+        "detail": d.get("detail"),
+        "application_name": d.get("application_name"),
+        "backend_type": d.get("backend_type"),
+        "forwarded_ts": None,
+    }
+    return payload, msgid, d.get("error_severity")
+
+def tcp_connect():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(SOCKET_TIMEOUT_SEC)
+    s.connect((SYSLOG_HOST, SYSLOG_PORT))
+    s.settimeout(SOCKET_TIMEOUT_SEC)
+    return s
+
+def send_syslog_tcp_rfc6587(sock, payload_obj: dict, msgid: str, severity_name: str):
+    sev = SEV_MAP.get((severity_name or "").upper(), DEFAULT_SEVERITY)
+    payload_obj["forwarded_ts"] = rfc3339_now_local()
+    payload = json.dumps(payload_obj, ensure_ascii=False)
+
+    msg = make_rfc5424(payload, severity=sev, msgid=msgid)
+    msg_bytes = msg.encode("utf-8", errors="replace")
+    frame = str(len(msg_bytes)).encode("ascii") + b" " + msg_bytes
+    sock.sendall(frame)
+
+def looks_ok_row(row) -> bool:
+    # мягкая, но полезная валидация, чтобы не слать мусор при рассинхроне
+    if not row or len(row) < 4:
+        return False
+    lt = row[0] or ""
+    # lt вида "2026-02-18 14:20:41.764 MSK"
+    if not (len(lt) >= 23 and lt[0:4].isdigit() and lt[4] == "-" and lt[7] == "-"):
+        return False
+    pid = row[3] or ""
+    if not pid.isdigit():
+        return False
+    return True
+
+def resync_to_anchor(buf: bytes):
+    """
+    Сдвинуть буфер к следующему якорю начала записи.
+    Возвращает (new_buf, dropped_bytes). Если якоря нет — выкидывает часть буфера.
+    """
+    m = ANCHOR_RE.search(buf)
+    if not m:
+        drop = min(len(buf), 1024 * 1024)
+        return buf[drop:], drop
+
+    # m.start(1) указывает на начало '2026-...'
+    pos = m.start(1)
+    return buf[pos:], pos
+
+def follow():
+    tcp_sock = None
+    path = current_log_file()
+    offset = load_state(path)
+
+    buf = b""
+    sent = 0
+    skipped = 0
+    last_stat = time.time()
+
+    last_progress = time.time()
+    last_offset_seen = offset
+
+    log(f"start path={path} offset={offset}")
+
+    while True:
+        # смена файла по дате
+        new_path = current_log_file()
+        if new_path != path:
+            path = new_path
+            offset = load_state(path)  # новый файл -> 0
+            buf = b""
+            last_offset_seen = offset
+            last_progress = time.time()
+            log(f"switched to new log file: path={path} offset={offset}")
+
+        # connect/reconnect
+        if tcp_sock is None:
+            try:
+                tcp_sock = tcp_connect()
+                log(f"tcp connected to {SYSLOG_HOST}:{SYSLOG_PORT}")
+            except Exception as e:
+                log(f"tcp connect failed: {e}")
+                tcp_sock = None
+                time.sleep(TCP_RECONNECT_DELAY_SEC)
+                continue
+
+        if not os.path.exists(path):
+            time.sleep(1)
+            continue
+
+        try:
+            # truncate/пересоздание файла
+            try:
+                size = os.path.getsize(path)
+                if size < offset:
+                    log(f"file truncated: size={size} < offset={offset}, reset offset=0")
+                    offset = 0
+                    save_state(path, offset)
+                    buf = b""
+            except Exception:
+                pass
+
+            # читаем прирост
+            with open(path, "rb") as fb:
+                fb.seek(offset)
+                chunk = fb.read(CHUNK_SIZE)
+
+            if not chunk:
+                time.sleep(POLL_SEC)
+            else:
+                buf += chunk
+
+            # парсим записи, сколько получится
+            while True:
+                if not buf:
+                    break
+
+                bio = io.BytesIO(buf)
+                tio = io.TextIOWrapper(bio, encoding="utf-8", errors="replace", newline="")
+                reader = csv.reader(tio)
+
+                try:
+                    row = next(reader)
+                except StopIteration:
+                    # данных недостаточно для целой записи (например, запись многострочная и не дописана)
+                    break
+                except Exception as e:
+                    old = len(buf)
+                    buf, dropped = resync_to_anchor(buf)
+                    offset += dropped
+                    save_state(path, offset)
+                    skipped += 1
+                    log(f"resync(parse-error): dropped={dropped} buf={old}->{len(buf)} err={e}")
+                    continue
+
+                consumed = bio.tell()  # сколько байт реально съедено из buf
+                if consumed <= 0:
+                    break
+
+                if not looks_ok_row(row):
+                    old = len(buf)
+                    buf, dropped = resync_to_anchor(buf)
+                    offset += dropped
+                    save_state(path, offset)
+                    skipped += 1
+                    log(f"resync(bad-row): dropped={dropped} buf={old}->{len(buf)} row0={row[0] if row else None!r}")
+                    continue
+
+                # отправка
+                try:
+                    payload_obj, msgid, sevname = normalize_event(row)
+                    send_syslog_tcp_rfc6587(tcp_sock, payload_obj, msgid, sevname)
+                except (socket.timeout, BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as e:
+                    log(f"send failed (reconnect): {e}")
+                    try:
+                        tcp_sock.close()
+                    except Exception:
+                        pass
+                    tcp_sock = None
+                    # запись не коммитим
+                    break
+                except Exception as e:
+                    # пропускаем именно эту запись (но корректно сдвигаем consumed)
+                    buf = buf[consumed:]
+                    offset += consumed
+                    save_state(path, offset)
+                    skipped += 1
+                    log(f"skip(send/normalize error): consumed={consumed} offset={offset} err={e}")
+                    continue
+
+                buf = buf[consumed:]
+                offset += consumed
+                save_state(path, offset)
+                sent += 1
+
+                if offset != last_offset_seen:
+                    last_offset_seen = offset
+                    last_progress = time.time()
+
+            # анти-залипание: долго нет прогресса и буфер уже большой => значит битая запись/рассинхрон
+            if (time.time() - last_progress) > NO_PROGRESS_SEC and len(buf) > MIN_BUF_FOR_RESYNC:
+                old = len(buf)
+                buf, dropped = resync_to_anchor(buf)
+                offset += dropped
+                save_state(path, offset)
+                skipped += 1
+                log(f"resync(no-progress): dropped={dropped} buf={old}->{len(buf)} offset={offset}")
+                last_offset_seen = offset
+                last_progress = time.time()
+
+            if len(buf) > MAX_BUFFER_BYTES:
+                old = len(buf)
+                buf, dropped = resync_to_anchor(buf)
+                offset += dropped
+                save_state(path, offset)
+                skipped += 1
+                log(f"resync(too-big): dropped={dropped} buf={old}->{len(buf)} offset={offset}")
+                last_offset_seen = offset
+                last_progress = time.time()
+
+        except Exception as e:
+            log(f"loop error: {e}")
+            time.sleep(1)
+
+        now = time.time()
+        if now - last_stat >= STAT_EVERY_SEC:
+            log(f"stat: path={path} sent={sent} skipped={skipped} offset={offset} buf_bytes={len(buf)}")
+            last_stat = now
+
+if __name__ == "__main__":
+    follow()
+EOF
