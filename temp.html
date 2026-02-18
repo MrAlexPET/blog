@@ -1,1 +1,34 @@
-sss
+1.
+sudo tee /etc/systemd/system/1. pglog-cleanup.service >/dev/null <<'EOF'
+[Unit]
+Description=Delete yesterday PostgreSQL csv logs
+
+[Service]
+Type=oneshot
+User=postgres
+ExecStart=/bin/bash -lc 'd=$(date -d "yesterday" +%F); rm -f /opt/log/pgpro/ent-16/pg_log/postgresql-${d}.csv*'
+EOF
+
+2.
+
+sudo tee /etc/systemd/system/pglog-cleanup.timer >/dev/null <<'EOF'
+[Unit]
+Description=Run pglog cleanup daily at 01:00
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+3.
+sudo systemctl daemon-reload
+sudo systemctl enable --now pglog-cleanup.timer
+systemctl list-timers --all | grep pglog-cleanup || true
+
+
+4. 
+
+sudo systemctl start pglog-cleanup.service
