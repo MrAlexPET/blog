@@ -1,1 +1,56 @@
-sss
+IF EXISTS (SELECT 1 FROM sys.server_event_sessions WHERE name = 'SIEM_1C_Queries')
+    DROP EVENT SESSION [SIEM_1C_Queries] ON SERVER;
+GO
+
+CREATE EVENT SESSION [SIEM_1C_Queries] ON SERVER
+ADD EVENT sqlserver.rpc_completed(
+    ACTION(
+        sqlserver.client_app_name,
+        sqlserver.client_hostname,
+        sqlserver.database_name,
+        sqlserver.nt_username,
+        sqlserver.server_principal_name,
+        sqlserver.session_id,
+        sqlserver.sql_text
+    )
+    WHERE (sqlserver.database_name = N'EXOERP')
+),
+ADD EVENT sqlserver.sql_statement_completed(
+    ACTION(
+        sqlserver.client_app_name,
+        sqlserver.client_hostname,
+        sqlserver.database_name,
+        sqlserver.nt_username,
+        sqlserver.server_principal_name,
+        sqlserver.session_id,
+        sqlserver.sql_text
+    )
+    WHERE (sqlserver.database_name = N'EXOERP')
+),
+ADD EVENT sqlserver.sql_batch_completed(
+    ACTION(
+        sqlserver.client_app_name,
+        sqlserver.client_hostname,
+        sqlserver.database_name,
+        sqlserver.nt_username,
+        sqlserver.server_principal_name,
+        sqlserver.session_id,
+        sqlserver.sql_text
+    )
+    WHERE (sqlserver.database_name = N'EXOERP')
+)
+ADD TARGET package0.event_file(
+    SET filename = N'C:\XEvents\siem_1c_queries',
+        max_file_size = (200),
+        max_rollover_files = (20)
+)
+WITH (
+    EVENT_RETENTION_MODE = ALLOW_SINGLE_EVENT_LOSS,
+    MAX_DISPATCH_LATENCY = 5 SECONDS,
+    TRACK_CAUSALITY = ON,
+    STARTUP_STATE = ON
+);
+GO
+
+ALTER EVENT SESSION [SIEM_1C_Queries] ON SERVER STATE = START;
+GO
