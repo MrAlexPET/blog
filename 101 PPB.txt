@@ -117,9 +117,7 @@ def control_handler(conn):
                     with open(filename, "wb") as f:
                         remaining = filesize
                         while remaining > 0:
-                            # chunk_size = 65536 if remaining >= 65536 else remaining
-                            # chunk = conn.recv(chunk_size)
-                            chunk = conn.recv(min(65536, remaining))
+                            chunk = recvall(conn, min(65536, remaining))
                             if not chunk:
                                 print(f"Клиент закрыл соединение во время передачи файла {filename}")
                                 break
@@ -188,7 +186,6 @@ if __name__ == "__main__":
     start_server()
 
 
-
 =============================
 client.py:
 import os
@@ -211,6 +208,8 @@ class RemoteClient:
         self.root = root
         self.root.title("Remote Desktop")
         self.root.geometry("1280x720")
+
+        self.sending_file = False
 
         # ======= GUI с grid =======
         self.root.rowconfigure(0, weight=1)
@@ -308,6 +307,9 @@ class RemoteClient:
 
     # ================= CONTROL =================
     def send_packet(self, packet_type, data_dict):
+        if self.sending_file:
+            return
+
         data = json.dumps(data_dict).encode()
         self.control_sock.sendall(struct.pack("B", packet_type))
         self.control_sock.sendall(struct.pack(">I", len(data)))
@@ -362,20 +364,36 @@ class RemoteClient:
     # ================= FILE =================
     def send_file(self, path):
         try:
+            self.sending_file = True
+
             filename = os.path.basename(path)
             filesize = os.path.getsize(path)
-            # Отправка мета
-            self.send_packet(7, {"filename": filename, "size": filesize})
-            # Отправка файла порциями
+
+            # отправка метаданных
+            meta = json.dumps({
+                "filename": filename,
+                "size": filesize
+            }).encode()
+
+            self.control_sock.sendall(struct.pack("B", 7))
+            self.control_sock.sendall(struct.pack(">I", len(meta)))
+            self.control_sock.sendall(meta)
+
+            # отправка файла
             with open(path, "rb") as f:
                 while True:
                     chunk = f.read(65536)
                     if not chunk:
                         break
                     self.control_sock.sendall(chunk)
+
             messagebox.showinfo("Готово", f"Файл {filename} успешно отправлен")
+
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось отправить файл:\n{e}")
+
+        finally:
+            self.sending_file = False
 
     def choose_and_send_file(self):
         path = filedialog.askopenfilename()
@@ -387,4 +405,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RemoteClient(root)
     root.mainloop()
+
+
 
