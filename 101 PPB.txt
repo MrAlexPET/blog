@@ -1,4 +1,7 @@
 server.py:
+import ctypes
+ctypes.windll.user32.SetProcessDPIAware()
+
 import socket
 import threading
 import struct
@@ -11,11 +14,16 @@ from pynput.keyboard import Controller as KeyboardController
 import json
 import pyautogui
 
+with mss.mss() as sct:
+    monitor = sct.monitors[1]
+    SCREEN_WIDTH = monitor["width"]
+    SCREEN_HEIGHT = monitor["height"]
+
 HOST = "0.0.0.0"
 VIDEO_PORT = 5000
 CONTROL_PORT = 5001
 
-SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
+# SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
 
 client_connected = False
 
@@ -27,7 +35,7 @@ keyboard = KeyboardController()
 
 def video_stream(conn):
     with mss.mss() as sct:
-        monitor = sct.monitors[1]
+        # monitor = sct.monitors[1]
 
         try:
             while True:
@@ -96,6 +104,24 @@ def control_handler(conn):
                 else:
                     mouse.release(Button.right)
 
+            elif packet_type == 7:  # передача файлов
+                filename = message["filename"]
+                filesize = message["size"]
+
+                print(f"Получаю файл {filename}, размер {filesize} байт")
+
+                with open(filename, "wb") as f:
+                    remaining = filesize
+                    while remaining > 0:
+                        chunk_size = 65536 if remaining >= 65536 else remaining
+                        chunk = conn.recv(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        remaining -= len(chunk)
+
+                print(f"Файл {filename} успешно получен")
+
     except Exception as e:
         print("Control соединение закрыто:", e)
 
@@ -144,8 +170,10 @@ if __name__ == "__main__":
 
 
 
+
 =============================
 client.py:
+import os.path
 import socket
 import struct
 import tkinter as tk
@@ -239,21 +267,14 @@ class RemoteClient:
         self.control_sock.sendall(data)
 
     def on_mouse_move(self, event):
-        if not hasattr(self, "video_width"):
-            return
-
-        scale_x = self.remote_width / self.video_width
-        scale_y = self.remote_height / self.video_height
-
-        real_x = int(event.x * scale_x)
-        real_y = int(event.y * scale_y)
-
-        self.send_packet(2, {"x": real_x, "y": real_y})
+        self.send_mouse_position(event)
 
     def on_mouse_click(self, event):
+        self.send_mouse_position(event)
         self.send_packet(3, {"action": "down"})
 
     def on_mouse_release(self, event):
+        self.send_mouse_position(event)
         self.send_packet(3, {"action": "up"})
 
     def on_key_press(self, event):
@@ -269,11 +290,43 @@ class RemoteClient:
     def on_right_click_up(self, event):
         self.send_packet(6, {"action": "up"})
 
+    def send_mouse_position(self, event):
+        if not hasattr(self, "video_width"):
+            return
+
+        label_width = self.label.winfo_width()
+        label_height = self.label.winfo_height()
+
+        # scale_x = self.remote_width / self.video_width
+        # scale_y = self.remote_height / self.video_height
+
+        scale_x = self.remote_width / label_width
+        scale_y = self.remote_height / label_height
+
+        real_x = int(event.x * scale_x)
+        real_y = int(event.y * scale_y)
+
+        self.send_packet(2, {"x": real_x, "y": real_y})
+        
+    def send_file(self, path):
+        filename = os.path.basename(path)
+        filesize = os.path.getsize(path)
+        
+        self.send_packet(7, {"filename": filename, "size": filesize})
+        
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(65535)
+                if not chunk:
+                    break
+                self.control_sock.sendall(chunk)
+                
+        print(f"Файл {filename} успешно отправлен")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = RemoteClient(root)
     root.mainloop()
-
 
 
