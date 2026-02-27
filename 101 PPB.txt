@@ -177,6 +177,7 @@ import os.path
 import socket
 import struct
 import tkinter as tk
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 import io
 import threading
@@ -192,10 +193,14 @@ class RemoteClient:
         self.root = root
         self.root.title("Remote Desktop")
 
+        # ====== Видео ======
         self.label = tk.Label(root)
         self.label.pack(fill="both", expand=True)
-
         self.root.geometry("1280x720")
+
+        # Кнопка отправки файлов
+        self.send_file_btn = tk.Button(root, text="Отправить файл", command=self.choose_and_send_file)
+        self.send_file_btn.pack(side="bottom", pady=5)
 
         # Видео сокет
         self.video_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -209,7 +214,6 @@ class RemoteClient:
         size_data = self.recvall(self.control_sock, 4)
         size = struct.unpack(">I", size_data)[0]
         screen_data = self.recvall(self.control_sock, size)
-
         screen_info = json.loads(screen_data.decode())
 
         self.remote_width = screen_info["width"]
@@ -221,7 +225,6 @@ class RemoteClient:
         self.label.bind("<MouseWheel>", self.on_mouse_wheel)
         self.label.bind("<ButtonPress-3>", self.on_right_click_down)
         self.label.bind("<ButtonRelease-3>", self.on_right_click_up)
-
         self.root.bind("<KeyPress>", self.on_key_press)
 
         threading.Thread(target=self.receive_video, daemon=True).start()
@@ -307,26 +310,35 @@ class RemoteClient:
         real_y = int(event.y * scale_y)
 
         self.send_packet(2, {"x": real_x, "y": real_y})
-        
+
     def send_file(self, path):
-        filename = os.path.basename(path)
-        filesize = os.path.getsize(path)
-        
-        self.send_packet(7, {"filename": filename, "size": filesize})
-        
-        with open(path, "rb") as f:
-            while True:
-                chunk = f.read(65535)
-                if not chunk:
-                    break
-                self.control_sock.sendall(chunk)
-                
-        print(f"Файл {filename} успешно отправлен")
+        try:
+            filename = os.path.basename(path)
+            filesize = os.path.getsize(path)
+
+            self.send_packet(7, {"filename": filename, "size": filesize})
+
+            with open(path, "rb") as f:
+                while True:
+                    chunk = f.read(65535)
+                    if not chunk:
+                        break
+                    self.control_sock.sendall(chunk)
+
+            messagebox.showinfo("Готово", f"Файл {filename} успешно отправлен")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось отправить файл:\n{e}")
+
+    def choose_and_send_file(self):
+        path = filedialog.askopenfilename()
+        if path:
+            threading.Thread(target=self.send_file, args=(path,), daemon=True).start()
 
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = RemoteClient(root)
     root.mainloop()
+
 
 
