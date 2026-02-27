@@ -1,157 +1,18 @@
-import os
-import socket
-import struct
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
-import io
-import threading
-import json
+image = Image.open(io.BytesIO(frame_data))
+self.video_width, self.video_height = image.size
 
-SERVER_IP = "169.254.36.5"
-VIDEO_PORT = 5000
-CONTROL_PORT = 5001
+label_width = self.label.winfo_width()
+label_height = self.label.winfo_height()
 
+if label_width > 1 and label_height > 1:
+    ratio = min(label_width / self.video_width,
+                label_height / self.video_height)
 
-class RemoteClient:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Remote Desktop")
-        self.root.geometry("1280x720")
+    new_width = int(self.video_width * ratio)
+    new_height = int(self.video_height * ratio)
 
-        # ======= GUI с grid =======
-        self.root.rowconfigure(0, weight=1)
-        self.root.columnconfigure(0, weight=1)
+    image = image.resize((new_width, new_height))
 
-        # Видео
-        self.label = tk.Label(root, bg="black")
-        self.label.grid(row=0, column=0, sticky="nsew")
-
-        # Кнопка отправки файлов
-        self.send_file_btn = tk.Button(root, text="Отправить файл", command=self.choose_and_send_file)
-        self.send_file_btn.grid(row=1, column=0, sticky="ew", pady=5)
-
-        # ======= Сокеты =======
-        self.video_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.video_sock.connect((SERVER_IP, VIDEO_PORT))
-
-        self.control_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.control_sock.connect((SERVER_IP, CONTROL_PORT))
-
-        # Получаем размер удаленного экрана
-        size_data = self.recvall(self.control_sock, 4)
-        size = struct.unpack(">I", size_data)[0]
-        screen_data = self.recvall(self.control_sock, size)
-        screen_info = json.loads(screen_data.decode())
-
-        self.remote_width = screen_info["width"]
-        self.remote_height = screen_info["height"]
-
-        # ======= События управления =======
-        self.label.bind("<Motion>", self.on_mouse_move)
-        self.label.bind("<ButtonPress-1>", self.on_mouse_click)
-        self.label.bind("<ButtonRelease-1>", self.on_mouse_release)
-        self.label.bind("<MouseWheel>", self.on_mouse_wheel)
-        self.label.bind("<ButtonPress-3>", self.on_right_click_down)
-        self.label.bind("<ButtonRelease-3>", self.on_right_click_up)
-        self.root.bind("<KeyPress>", self.on_key_press)
-
-        # Поток видео
-        threading.Thread(target=self.receive_video, daemon=True).start()
-
-    # ================= VIDEO =================
-    def receive_video(self):
-        try:
-            while True:
-                size_data = self.recvall(self.video_sock, 4)
-                if not size_data:
-                    break
-                size = struct.unpack(">I", size_data)[0]
-                frame_data = self.recvall(self.video_sock, size)
-                image = Image.open(io.BytesIO(frame_data))
-                photo = ImageTk.PhotoImage(image)
-                self.label.config(image=photo)
-                self.label.image = photo
-                self.video_width, self.video_height = image.size
-        except Exception as e:
-            print("Видео соединение закрыто:", e)
-
-    def recvall(self, sock, size):
-        data = b""
-        while len(data) < size:
-            packet = sock.recv(size - len(data))
-            if not packet:
-                return None
-            data += packet
-        return data
-
-    # ================= CONTROL =================
-    def send_packet(self, packet_type, data_dict):
-        data = json.dumps(data_dict).encode()
-        self.control_sock.sendall(struct.pack("B", packet_type))
-        self.control_sock.sendall(struct.pack(">I", len(data)))
-        self.control_sock.sendall(data)
-
-    def send_mouse_position(self, event):
-        if not hasattr(self, "video_width"):
-            return
-        label_width = self.label.winfo_width()
-        label_height = self.label.winfo_height()
-        scale_x = self.remote_width / label_width
-        scale_y = self.remote_height / label_height
-        real_x = int(event.x * scale_x)
-        real_y = int(event.y * scale_y)
-        self.send_packet(2, {"x": real_x, "y": real_y})
-
-    def on_mouse_move(self, event):
-        self.send_mouse_position(event)
-
-    def on_mouse_click(self, event):
-        self.send_mouse_position(event)
-        self.send_packet(3, {"action": "down"})
-
-    def on_mouse_release(self, event):
-        self.send_mouse_position(event)
-        self.send_packet(3, {"action": "up"})
-
-    def on_key_press(self, event):
-        if event.char:
-            self.send_packet(4, {"key": event.char})
-
-    def on_mouse_wheel(self, event):
-        self.send_packet(5, {"delta": event.delta})
-
-    def on_right_click_down(self, event):
-        self.send_packet(6, {"action": "down"})
-
-    def on_right_click_up(self, event):
-        self.send_packet(6, {"action": "up"})
-
-    # ================= FILE =================
-    def send_file(self, path):
-        try:
-            filename = os.path.basename(path)
-            filesize = os.path.getsize(path)
-            # Отправка мета
-            self.send_packet(7, {"filename": filename, "size": filesize})
-            # Отправка файла порциями
-            with open(path, "rb") as f:
-                while True:
-                    chunk = f.read(65536)
-                    if not chunk:
-                        break
-                    self.control_sock.sendall(chunk)
-            messagebox.showinfo("Готово", f"Файл {filename} успешно отправлен")
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось отправить файл:\n{e}")
-
-    def choose_and_send_file(self):
-        path = filedialog.askopenfilename()
-        if path:
-            threading.Thread(target=self.send_file, args=(path,), daemon=True).start()
-
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = RemoteClient(root)
-    root.mainloop()
+photo = ImageTk.PhotoImage(image)
+self.label.config(image=photo)
+self.label.image = photo
