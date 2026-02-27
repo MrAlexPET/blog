@@ -53,6 +53,13 @@ def video_stream(conn):
 
 def control_handler(conn):
     try:
+        screen_info = json.dumps({
+            "width": SCREEN_WIDTH,
+            "height": SCREEN_HEIGHT
+        }).encode()
+
+        conn.sendall(struct.pack(">I", len(screen_info)))
+        conn.sendall(screen_info)
         while True:
             header = conn.recv(1)
             if not header:
@@ -98,7 +105,7 @@ def control_handler(conn):
 # ================= SERVER =================
 
 def start_server():
-    print(pyautogui.size())
+    # print(pyautogui.size())
     global client_connected
 
     video_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -136,6 +143,7 @@ if __name__ == "__main__":
     start_server()
 
 
+
 =============================
 client.py:
 import socket
@@ -150,9 +158,6 @@ SERVER_IP = "169.254.36.5"
 VIDEO_PORT = 5000
 CONTROL_PORT = 5001
 
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 955
-
 
 class RemoteClient:
     def __init__(self, root):
@@ -160,7 +165,9 @@ class RemoteClient:
         self.root.title("Remote Desktop")
 
         self.label = tk.Label(root)
-        self.label.pack()
+        self.label.pack(fill="both", expand=True)
+
+        self.root.geometry("1280x720")
 
         # Видео сокет
         self.video_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -169,6 +176,16 @@ class RemoteClient:
         # Сокет управления
         self.control_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.control_sock.connect((SERVER_IP, CONTROL_PORT))
+
+        # Получаем размер удаленного экрана
+        size_data = self.recvall(self.control_sock, 4)
+        size = struct.unpack(">I", size_data)[0]
+        screen_data = self.recvall(self.control_sock, size)
+
+        screen_info = json.loads(screen_data.decode())
+
+        self.remote_width = screen_info["width"]
+        self.remote_height = screen_info["height"]
 
         self.label.bind("<Motion>", self.on_mouse_move)
         self.label.bind("<ButtonPress-1>", self.on_mouse_click)
@@ -222,12 +239,16 @@ class RemoteClient:
         self.control_sock.sendall(data)
 
     def on_mouse_move(self, event):
-        self.send_packet(2, {"x": event.x, "y": event.y})
-        scale_x = SCREEN_WIDTH / self.video_width
-        scale_y = SCREEN_HEIGHT / self.video_height
+        if not hasattr(self, "video_width"):
+            return
+
+        scale_x = self.remote_width / self.video_width
+        scale_y = self.remote_height / self.video_height
 
         real_x = int(event.x * scale_x)
         real_y = int(event.y * scale_y)
+
+        self.send_packet(2, {"x": real_x, "y": real_y})
 
     def on_mouse_click(self, event):
         self.send_packet(3, {"action": "down"})
@@ -253,4 +274,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RemoteClient(root)
     root.mainloop()
+
+
 
