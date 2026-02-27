@@ -1,21 +1,32 @@
-def send_mouse_position(self, event):
-    if not hasattr(self, "video_width"):
-        return
+def send_file(self, path):
+    try:
+        self.sending_file = True
 
-    # Проверяем что клик внутри изображения
-    if (event.x < self.offset_x or
-        event.x > self.offset_x + self.display_width or
-        event.y < self.offset_y or
-        event.y > self.offset_y + self.display_height):
-        return
+        filename = os.path.basename(path)
+        filesize = os.path.getsize(path)
 
-    x = event.x - self.offset_x
-    y = event.y - self.offset_y
+        # отправка метаданных
+        meta = json.dumps({
+            "filename": filename,
+            "size": filesize
+        }).encode()
 
-    scale_x = self.remote_width / self.display_width
-    scale_y = self.remote_height / self.display_height
+        self.control_sock.sendall(struct.pack("B", 7))
+        self.control_sock.sendall(struct.pack(">I", len(meta)))
+        self.control_sock.sendall(meta)
 
-    real_x = int(x * scale_x)
-    real_y = int(y * scale_y)
+        # отправка файла
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                self.control_sock.sendall(chunk)
 
-    self.send_packet(2, {"x": real_x, "y": real_y})
+        messagebox.showinfo("Готово", f"Файл {filename} успешно отправлен")
+
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Не удалось отправить файл:\n{e}")
+
+    finally:
+        self.sending_file = False
