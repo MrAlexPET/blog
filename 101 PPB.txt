@@ -12,7 +12,6 @@ import time
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController
 import json
-import pyautogui
 
 with mss.mss() as sct:
     monitor = sct.monitors[1]
@@ -22,8 +21,6 @@ with mss.mss() as sct:
 HOST = "0.0.0.0"
 VIDEO_PORT = 5000
 CONTROL_PORT = 5001
-
-# SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
 
 client_connected = False
 
@@ -35,7 +32,6 @@ keyboard = KeyboardController()
 
 def video_stream(conn):
     with mss.mss() as sct:
-        # monitor = sct.monitors[1]
 
         try:
             while True:
@@ -49,7 +45,7 @@ def video_stream(conn):
                 conn.sendall(struct.pack(">I", len(data)))
                 conn.sendall(data)
 
-                time.sleep(0.06)
+                time.sleep(0.02)
 
         except Exception as e:
             print("Видео соединение закрыто:", e)
@@ -69,16 +65,22 @@ def control_handler(conn):
         conn.sendall(struct.pack(">I", len(screen_info)))
         conn.sendall(screen_info)
         while True:
-            header = conn.recv(1)
+            header = recvall(conn, 1)
             if not header:
                 break
 
             packet_type = struct.unpack("B", header)[0]
 
-            size_data = conn.recv(4)
+            size_data = recvall(conn, 4)
+            if not size_data:
+                break
+
             size = struct.unpack(">I", size_data)[0]
 
-            data = conn.recv(size)
+            data = recvall(conn, size)
+            if not data:
+                break
+
             message = json.loads(data.decode())
 
             if packet_type == 2:  # движение мыши
@@ -135,6 +137,16 @@ def control_handler(conn):
     conn.close()
 
 
+def recvall(sock, size):
+    data = b""
+    while len(data) < size:
+        packet = sock.recv(size - len(data))
+        if not packet:
+            return None
+        data += packet
+    return data
+
+
 # ================= SERVER =================
 
 def start_server():
@@ -174,8 +186,6 @@ def start_server():
 
 if __name__ == "__main__":
     start_server()
-
-
 
 
 
@@ -251,11 +261,39 @@ class RemoteClient:
                     break
                 size = struct.unpack(">I", size_data)[0]
                 frame_data = self.recvall(self.video_sock, size)
+                if not frame_data:
+                    break
+
                 image = Image.open(io.BytesIO(frame_data))
+                self.video_width, self.video_height = image.size
+
+                label_width = self.label.winfo_width()
+                label_height = self.label.winfo_height()
+
+                if label_width > 1 and label_height > 1:
+                    ratio = min(label_width / self.video_width,
+                                label_height / self.video_height)
+
+                    new_width = int(self.video_width * ratio)
+                    new_height = int(self.video_height * ratio)
+
+                    image = image.resize((new_width, new_height))
+
+                    self.display_width = new_width
+                    self.display_height = new_height
+
+                    self.offset_x = (label_width - new_width) // 2
+                    self.offset_y = (label_height - new_height) // 2
+                else:
+                    self.display_width = self.video_width
+                    self.display_height = self.video_height
+                    self.offset_x = 0
+                    self.offset_y = 0
+
                 photo = ImageTk.PhotoImage(image)
                 self.label.config(image=photo)
                 self.label.image = photo
-                self.video_width, self.video_height = image.size
+
         except Exception as e:
             print("Видео соединение закрыто:", e)
 
@@ -278,12 +316,23 @@ class RemoteClient:
     def send_mouse_position(self, event):
         if not hasattr(self, "video_width"):
             return
-        label_width = self.label.winfo_width()
-        label_height = self.label.winfo_height()
-        scale_x = self.remote_width / label_width
-        scale_y = self.remote_height / label_height
-        real_x = int(event.x * scale_x)
-        real_y = int(event.y * scale_y)
+
+        # Проверяем что клик внутри изображения
+        if (event.x < self.offset_x or
+                event.x > self.offset_x + self.display_width or
+                event.y < self.offset_y or
+                event.y > self.offset_y + self.display_height):
+            return
+
+        x = event.x - self.offset_x
+        y = event.y - self.offset_y
+
+        scale_x = self.remote_width / self.display_width
+        scale_y = self.remote_height / self.display_height
+
+        real_x = int(x * scale_x)
+        real_y = int(y * scale_y)
+
         self.send_packet(2, {"x": real_x, "y": real_y})
 
     def on_mouse_move(self, event):
@@ -338,7 +387,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RemoteClient(root)
     root.mainloop()
-
-
-
 
