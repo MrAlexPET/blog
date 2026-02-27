@@ -8,10 +8,13 @@ import time
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController
 import json
+import pyautogui
 
 HOST = "0.0.0.0"
 VIDEO_PORT = 5000
 CONTROL_PORT = 5001
+
+SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
 
 client_connected = False
 
@@ -76,6 +79,15 @@ def control_handler(conn):
                 keyboard.press(key)
                 keyboard.release(key)
 
+            elif packet_type == 5:  # колесо
+                mouse.scroll(0, int(message["delta"] / 120))
+
+            elif packet_type == 6:  # пкм
+                if message["action"] == "down":
+                    mouse.press(Button.right)
+                else:
+                    mouse.release(Button.right)
+
     except Exception as e:
         print("Control соединение закрыто:", e)
 
@@ -85,6 +97,7 @@ def control_handler(conn):
 # ================= SERVER =================
 
 def start_server():
+    print(pyautogui.size())
     global client_connected
 
     video_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -122,6 +135,7 @@ if __name__ == "__main__":
     start_server()
 
 
+=============================
 
 import socket
 import struct
@@ -131,9 +145,12 @@ import io
 import threading
 import json
 
-SERVER_IP = "169.254.36.5"  # <-- твой IP
+SERVER_IP = "169.254.36.5"
 VIDEO_PORT = 5000
 CONTROL_PORT = 5001
+
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 955
 
 
 class RemoteClient:
@@ -148,13 +165,16 @@ class RemoteClient:
         self.video_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.video_sock.connect((SERVER_IP, VIDEO_PORT))
 
-        # Контроль сокет
+        # Сокет управления
         self.control_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.control_sock.connect((SERVER_IP, CONTROL_PORT))
 
         self.label.bind("<Motion>", self.on_mouse_move)
         self.label.bind("<ButtonPress-1>", self.on_mouse_click)
         self.label.bind("<ButtonRelease-1>", self.on_mouse_release)
+        self.label.bind("<MouseWheel>", self.on_mouse_wheel)
+        self.label.bind("<ButtonPress-3>", self.on_right_click_down)
+        self.label.bind("<ButtonRelease-3>", self.on_right_click_up)
 
         self.root.bind("<KeyPress>", self.on_key_press)
 
@@ -178,6 +198,8 @@ class RemoteClient:
                 self.label.config(image=photo)
                 self.label.image = photo
 
+                self.video_width, self.video_height = image.size
+
         except Exception as e:
             print("Видео соединение закрыто:", e)
 
@@ -200,6 +222,11 @@ class RemoteClient:
 
     def on_mouse_move(self, event):
         self.send_packet(2, {"x": event.x, "y": event.y})
+        scale_x = SCREEN_WIDTH / self.video_width
+        scale_y = SCREEN_HEIGHT / self.video_height
+
+        real_x = int(event.x * scale_x)
+        real_y = int(event.y * scale_y)
 
     def on_mouse_click(self, event):
         self.send_packet(3, {"action": "down"})
@@ -210,6 +237,15 @@ class RemoteClient:
     def on_key_press(self, event):
         if event.char:
             self.send_packet(4, {"key": event.char})
+
+    def on_mouse_wheel(self, event):
+        self.send_packet(5, {"delta": event.delta})
+
+    def on_right_click_down(self, event):
+        self.send_packet(6, {"action": "down"})
+
+    def on_right_click_up(self, event):
+        self.send_packet(6, {"action": "up"})
 
 
 if __name__ == "__main__":
