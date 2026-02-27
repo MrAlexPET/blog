@@ -1,3 +1,4 @@
+server.py:
 import socket
 import threading
 import struct
@@ -136,7 +137,7 @@ if __name__ == "__main__":
 
 
 =============================
-
+client.py:
 import socket
 import struct
 import tkinter as tk
@@ -252,3 +253,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = RemoteClient(root)
     root.mainloop()
+
