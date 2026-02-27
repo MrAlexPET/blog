@@ -1,18 +1,21 @@
-image = Image.open(io.BytesIO(frame_data))
-self.video_width, self.video_height = image.size
+def send_mouse_position(self, event):
+    if not hasattr(self, "video_width"):
+        return
 
-label_width = self.label.winfo_width()
-label_height = self.label.winfo_height()
+    # Проверяем что клик внутри изображения
+    if (event.x < self.offset_x or
+        event.x > self.offset_x + self.display_width or
+        event.y < self.offset_y or
+        event.y > self.offset_y + self.display_height):
+        return
 
-if label_width > 1 and label_height > 1:
-    ratio = min(label_width / self.video_width,
-                label_height / self.video_height)
+    x = event.x - self.offset_x
+    y = event.y - self.offset_y
 
-    new_width = int(self.video_width * ratio)
-    new_height = int(self.video_height * ratio)
+    scale_x = self.remote_width / self.display_width
+    scale_y = self.remote_height / self.display_height
 
-    image = image.resize((new_width, new_height))
+    real_x = int(x * scale_x)
+    real_y = int(y * scale_y)
 
-photo = ImageTk.PhotoImage(image)
-self.label.config(image=photo)
-self.label.image = photo
+    self.send_packet(2, {"x": real_x, "y": real_y})
