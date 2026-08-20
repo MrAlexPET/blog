@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics.Eventing.Reader;
 using System.Security.Principal;
+using System.Xml.Linq;
 using System.Windows.Forms;
 
 namespace LastAuthentication
@@ -31,18 +32,17 @@ namespace LastAuthentication
                 DateTime? previousLogin =
                     FindPreviousAuthentication(sid);
 
-                // Временное диагностическое окно.
-                // Оно поможет убедиться, что программа
-                // действительно находит нужное событие.
+                // Временная диагностика
                 MessageBox.Show(
-                    $"SID: {sid}\n" +
                     $"Пользователь: {username}\n\n" +
-                    $"Найденное предыдущее время:\n" +
-                    $"{(
+                    $"SID:\n{sid}\n\n" +
+                    $"Предыдущая аутентификация:\n" +
+                    (
                         previousLogin.HasValue
-                            ? previousLogin.Value.ToString("dd.MM.yyyy HH:mm:ss")
+                            ? previousLogin.Value.ToString(
+                                "dd.MM.yyyy HH:mm:ss")
                             : "НЕ НАЙДЕНО"
-                    )}",
+                    ),
                     "DEBUG",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
@@ -60,7 +60,7 @@ namespace LastAuthentication
             {
                 MessageBox.Show(
                     "Произошла ошибка:\n\n" +
-                    ex.Message,
+                    ex,
                     "Last Authentication",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
@@ -68,19 +68,22 @@ namespace LastAuthentication
             }
         }
 
-        private DateTime? FindPreviousAuthentication(string sid)
+        private DateTime? FindPreviousAuthentication(string currentSid)
         {
             try
             {
-                string query = $@"
+                /*
+                 * Получаем последние события 4624.
+                 *
+                 * Здесь намеренно НЕ фильтруем SID через XPath.
+                 * Мы будем самостоятельно разбирать каждое событие.
+                 */
+
+                string query = @"
                     <QueryList>
                         <Query Id=""0"" Path=""Security"">
                             <Select Path=""Security"">
                                 *[System[EventID=4624]]
-                                and
-                                *[EventData[
-                                    Data[@Name='TargetUserSid'] = '{sid}'
-                                ]]
                             </Select>
                         </Query>
                     </QueryList>";
@@ -91,7 +94,6 @@ namespace LastAuthentication
                     query
                 )
                 {
-                    // Читать начиная с самых новых событий.
                     ReverseDirection = true
                 };
 
@@ -102,6 +104,8 @@ namespace LastAuthentication
 
                 DateTime programStart = DateTime.Now;
 
+                bool currentLoginFound = false;
+
                 while ((eventRecord = reader.ReadEvent()) != null)
                 {
                     try
@@ -109,52 +113,60 @@ namespace LastAuthentication
                         if (!eventRecord.TimeCreated.HasValue)
                             continue;
 
-                        DateTime eventTime =
-                            eventRecord.TimeCreated.Value;
-
                         string xml = eventRecord.ToXml();
 
-                        // Получаем LogonType.
-                        int logonType = GetLogonType(xml);
+                        AuthenticationEventInfo info =
+                            ParseAuthenticationEvent(xml);
 
                         /*
-                         * Типы входа:
+                         * Нас интересуют только:
                          *
-                         * 2  = Interactive
-                         * 10 = RemoteInteractive (RDP)
-                         *
-                         * Остальные типы нас пока не интересуют.
+                         * LogonType 2  = обычный вход
+                         * LogonType 10 = RDP
                          */
 
-                        if (logonType != 2 &&
-                            logonType != 10)
+                        if (info.LogonType != 2 &&
+                            info.LogonType != 10)
                         {
                             continue;
                         }
 
                         /*
-                         * Если программа запускается автоматически
-                         * сразу после входа, самое новое событие
-                         * 4624 будет текущим входом.
-                         *
-                         * Поэтому если событие произошло менее
-                         * 2 минут назад, пропускаем его и ищем
-                         * следующее событие.
-                         *
-                         * Если программа запускается вручную,
-                         * последнее событие обычно будет старше
-                         * 2 минут и будет считаться последним
+                         * Проверяем SID пользователя.
+                         */
+
+                        if (!string.Equals(
+                            info.TargetUserSid,
+                            currentSid,
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        DateTime eventTime =
+                            eventRecord.TimeCreated.Value;
+
+                        /*
+                         * Если самое новое событие произошло
+                         * совсем недавно, считаем его текущим
                          * входом.
                          */
 
                         TimeSpan difference =
                             programStart - eventTime;
 
-                        if (difference.TotalSeconds >= 0 &&
+                        if (!currentLoginFound &&
+                            difference.TotalSeconds >= 0 &&
                             difference.TotalSeconds <= 120)
                         {
+                            currentLoginFound = true;
                             continue;
                         }
+
+                        /*
+                         * Следующее подходящее событие —
+                         * предыдущая аутентификация.
+                         */
 
                         return eventTime;
                     }
@@ -170,7 +182,7 @@ namespace LastAuthentication
             {
                 MessageBox.Show(
                     "Нет доступа к журналу Security.\n\n" +
-                    "Попробуйте запустить программу " +
+                    "Запустите VS Code или PowerShell " +
                     "от имени администратора.",
                     "Last Authentication",
                     MessageBoxButtons.OK,
@@ -183,7 +195,7 @@ namespace LastAuthentication
             {
                 MessageBox.Show(
                     "Ошибка чтения журнала Security:\n\n" +
-                    ex.Message,
+                    ex,
                     "Last Authentication",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
@@ -193,53 +205,61 @@ namespace LastAuthentication
             }
         }
 
-        private int GetLogonType(string xml)
+        private AuthenticationEventInfo ParseAuthenticationEvent(
+            string xml)
         {
+            AuthenticationEventInfo result =
+                new AuthenticationEventInfo();
+
             try
             {
-                const string startTag =
-                    "<Data Name=\"LogonType\">";
+                XDocument document =
+                    XDocument.Parse(xml);
 
-                const string endTag =
-                    "</Data>";
+                XNamespace ns =
+                    "http://schemas.microsoft.com/win/2004/08/events/event";
 
-                int start =
-                    xml.IndexOf(startTag);
-
-                if (start == -1)
-                    return -1;
-
-                start += startTag.Length;
-
-                int end =
-                    xml.IndexOf(
-                        endTag,
-                        start
-                    );
-
-                if (end == -1)
-                    return -1;
-
-                string value =
-                    xml.Substring(
-                        start,
-                        end - start
-                    ).Trim();
-
-                if (int.TryParse(
-                    value,
-                    out int logonType))
+                foreach (XElement data
+                    in document.Descendants(ns + "Data"))
                 {
-                    return logonType;
+                    string? name =
+                        data.Attribute("Name")?.Value;
+
+                    string value =
+                        data.Value;
+
+                    if (name == "TargetUserSid")
+                    {
+                        result.TargetUserSid = value;
+                    }
+                    else if (name == "TargetUserName")
+                    {
+                        result.TargetUserName = value;
+                    }
+                    else if (name == "TargetDomainName")
+                    {
+                        result.TargetDomainName = value;
+                    }
+                    else if (name == "LogonType")
+                    {
+                        int.TryParse(
+                            value,
+                            out result.LogonType
+                        );
+                    }
+                    else if (name == "TargetLogonId")
+                    {
+                        result.TargetLogonId = value;
+                    }
                 }
             }
             catch
             {
-                // Если не удалось разобрать XML,
-                // возвращаем неизвестный тип.
+                // Если событие невозможно разобрать,
+                // возвращаем пустой результат.
             }
 
-            return -1;
+            return result;
         }
 
         private void ShowLastAuthentication(
@@ -254,7 +274,7 @@ namespace LastAuthentication
                 $"аутентификация:\n" +
 
                 $"{authenticationTime:dd.MM.yyyy HH:mm:ss}",
-                
+
                 "Последняя аутентификация",
 
                 MessageBoxButtons.OK,
@@ -262,5 +282,18 @@ namespace LastAuthentication
                 MessageBoxIcon.Information
             );
         }
+    }
+
+    public class AuthenticationEventInfo
+    {
+        public string TargetUserSid { get; set; } = "";
+
+        public string TargetUserName { get; set; } = "";
+
+        public string TargetDomainName { get; set; } = "";
+
+        public string TargetLogonId { get; set; } = "";
+
+        public int LogonType { get; set; } = -1;
     }
 }
