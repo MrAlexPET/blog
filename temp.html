@@ -1,32 +1,20 @@
-def send_file(self, path):
-    try:
-        self.sending_file = True
+using System;
+using System.Windows.Forms;
 
-        filename = os.path.basename(path)
-        filesize = os.path.getsize(path)
+namespace LastAuthentication
+{
+    internal static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            ApplicationConfiguration.Initialize();
 
-        # отправка метаданных
-        meta = json.dumps({
-            "filename": filename,
-            "size": filesize
-        }).encode()
+            AuthenticationManager manager = new AuthenticationManager();
 
-        self.control_sock.sendall(struct.pack("B", 7))
-        self.control_sock.sendall(struct.pack(">I", len(meta)))
-        self.control_sock.sendall(meta)
+            manager.ProcessLogin();
 
-        # отправка файла
-        with open(path, "rb") as f:
-            while True:
-                chunk = f.read(65536)
-                if not chunk:
-                    break
-                self.control_sock.sendall(chunk)
-
-        messagebox.showinfo("Готово", f"Файл {filename} успешно отправлен")
-
-    except Exception as e:
-        messagebox.showerror("Ошибка", f"Не удалось отправить файл:\n{e}")
-
-    finally:
-        self.sending_file = False
+            Application.Run();
+        }
+    }
+}
