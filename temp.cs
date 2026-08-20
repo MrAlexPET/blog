@@ -6,9 +6,7 @@ private DateTime? FindPreviousAuthentication(string sid)
             <QueryList>
                 <Query Id=""0"" Path=""Security"">
                     <Select Path=""Security"">
-                        *[System[
-                            EventID=4624
-                        ]]
+                        *[System[EventID=4624]]
                         and
                         *[EventData[
                             Data[@Name='TargetUserSid'] = '{sid}'
@@ -23,7 +21,6 @@ private DateTime? FindPreviousAuthentication(string sid)
             query
         )
         {
-            // Читать события начиная с самого нового
             ReverseDirection = true
         };
 
@@ -32,44 +29,67 @@ private DateTime? FindPreviousAuthentication(string sid)
 
         EventRecord? eventRecord;
 
-        int validLogonsFound = 0;
+        DateTime programStart = DateTime.Now;
+
+        int foundEvents = 0;
 
         while ((eventRecord = reader.ReadEvent()) != null)
         {
             try
             {
-                // Получаем XML события
+                if (!eventRecord.TimeCreated.HasValue)
+                    continue;
+
                 string xml = eventRecord.ToXml();
 
-                // Проверяем тип входа.
+                // Получаем LogonType через XML.
+                int logonType = GetLogonType(xml);
+
+                // Нас интересуют:
                 //
                 // 2  = Interactive
                 // 10 = RemoteInteractive (RDP)
-                //
-                // Нас интересуют именно эти типы.
 
-                bool isInteractive =
-                    xml.Contains(
-                        "<Data Name=\"LogonType\">2</Data>"
-                    ) ||
-                    xml.Contains(
-                        "<Data Name=\"LogonType\">10</Data>"
-                    );
-
-                if (!isInteractive)
+                if (logonType != 2 && logonType != 10)
                     continue;
 
-                validLogonsFound++;
+                foundEvents++;
 
-                // Самое новое подходящее событие —
-                // текущий вход.
-                //
-                // Второе — предыдущий.
+                DateTime eventTime = eventRecord.TimeCreated.Value;
 
-                if (validLogonsFound == 2)
+                /*
+                 * Если программа была запущена автоматически
+                 * сразу после входа, самое новое событие 4624
+                 * является текущим входом.
+                 *
+                 * Поэтому:
+                 *
+                 * 1. Если событие произошло совсем недавно
+                 *    (например, менее 2 минут назад) —
+                 *    считаем его текущим входом.
+                 *
+                 * 2. Тогда следующее событие будет предыдущим.
+                 *
+                 * Если программа запускается вручную,
+                 * последнее событие старше 2 минут и поэтому
+                 * оно считается последним входом.
+                 */
+
+                TimeSpan difference = programStart - eventTime;
+
+                if (difference.TotalSeconds >= 0 &&
+                    difference.TotalSeconds <= 120)
                 {
-                    return eventRecord.TimeCreated;
+                    // Это, скорее всего, текущий вход.
+                    // Ищем следующий (предыдущий вход).
+
+                    continue;
                 }
+
+                // Это последнее подходящее событие,
+                // которое не является текущим входом.
+
+                return eventTime;
             }
             finally
             {
@@ -83,8 +103,7 @@ private DateTime? FindPreviousAuthentication(string sid)
     {
         MessageBox.Show(
             "Нет доступа к журналу Security.\n\n" +
-            "Запустите программу от имени администратора " +
-            "или настройте необходимые права.",
+            "Попробуйте запустить программу от имени администратора.",
             "Last Authentication",
             MessageBoxButtons.OK,
             MessageBoxIcon.Warning
