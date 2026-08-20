@@ -1,125 +1,18 @@
 using System;
-using System.IO;
-using System.Security.Principal;
-using System.Text.Json;
 using System.Windows.Forms;
 
 namespace LastAuthentication
 {
-    public class AuthenticationData
+    internal static class Program
     {
-        public string Sid { get; set; } = "";
-        public string Username { get; set; } = "";
-        public DateTime LastAuthentication { get; set; }
-    }
-
-    public class AuthenticationManager
-    {
-        private readonly string dataDirectory;
-        private readonly string dataFile;
-
-        public AuthenticationManager()
+        [STAThread]
+        static void Main()
         {
-            // Хранилище конкретного пользователя.
-            // Например:
-            // C:\Users\Alex\AppData\Local\LastAuthentication
+            ApplicationConfiguration.Initialize();
 
-            dataDirectory = Path.Combine(
-                Environment.GetFolderPath(
-                    Environment.SpecialFolder.LocalApplicationData),
-                "LastAuthentication"
-            );
+            AuthenticationManager manager = new AuthenticationManager();
 
-            dataFile = Path.Combine(
-                dataDirectory,
-                "authentication.json"
-            );
-
-            Directory.CreateDirectory(dataDirectory);
-        }
-
-        public void ProcessLogin()
-        {
-            WindowsIdentity identity = WindowsIdentity.GetCurrent();
-
-            string sid = identity.User?.Value ?? "";
-            string username = identity.Name;
-
-            DateTime currentLogin = DateTime.Now;
-
-            AuthenticationData? previousData = LoadData();
-
-            // Если это не первый вход данного пользователя,
-            // показываем информацию о предыдущем входе.
-            if (previousData != null &&
-                previousData.Sid == sid)
-            {
-                ShowLastAuthentication(previousData);
-            }
-
-            // Записываем текущий вход как последний.
-            AuthenticationData currentData = new AuthenticationData
-            {
-                Sid = sid,
-                Username = username,
-                LastAuthentication = currentLogin
-            };
-
-            SaveData(currentData);
-        }
-
-        private AuthenticationData? LoadData()
-        {
-            try
-            {
-                if (!File.Exists(dataFile))
-                    return null;
-
-                string json = File.ReadAllText(dataFile);
-
-                return JsonSerializer.Deserialize<AuthenticationData>(json);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private void SaveData(AuthenticationData data)
-        {
-            try
-            {
-                string json = JsonSerializer.Serialize(
-                    data,
-                    new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    });
-
-                File.WriteAllText(dataFile, json);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Не удалось сохранить информацию о входе.\n\n" +
-                    ex.Message,
-                    "Last Authentication",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-            }
-        }
-
-        private void ShowLastAuthentication(AuthenticationData data)
-        {
-            MessageBox.Show(
-                $"Пользователь:\n{data.Username}\n\n" +
-                $"Последняя успешная аутентификация:\n" +
-                $"{data.LastAuthentication:dd.MM.yyyy HH:mm:ss}",
-                "Последняя аутентификация",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
+            manager.ProcessLogin();
         }
     }
 }
