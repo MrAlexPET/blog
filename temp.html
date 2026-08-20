@@ -1,18 +1,176 @@
 using System;
+using System.Diagnostics.Eventing.Reader;
+using System.Security.Principal;
+using System.Text.Json;
 using System.Windows.Forms;
 
 namespace LastAuthentication
 {
-    internal static class Program
+    public class AuthenticationData
     {
-        [STAThread]
-        static void Main()
+        public string Sid { get; set; } = "";
+        public string Username { get; set; } = "";
+        public DateTime LastAuthentication { get; set; }
+    }
+
+    public class AuthenticationManager
+    {
+        private readonly string dataDirectory;
+        private readonly string dataFile;
+
+        public AuthenticationManager()
         {
-            ApplicationConfiguration.Initialize();
+            dataDirectory = System.IO.Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
+                "LastAuthentication"
+            );
 
-            AuthenticationManager manager = new AuthenticationManager();
+            dataFile = System.IO.Path.Combine(
+                dataDirectory,
+                "authentication.json"
+            );
 
-            manager.ProcessLogin();
+            System.IO.Directory.CreateDirectory(dataDirectory);
+        }
+
+        public void ProcessLogin()
+        {
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+
+            string sid = identity.User?.Value ?? "";
+            string username = identity.Name;
+
+            if (string.IsNullOrEmpty(sid))
+            {
+                MessageBox.Show(
+                    "Не удалось определить SID текущего пользователя.",
+                    "Last Authentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+
+                return;
+            }
+
+            // Ищем предыдущую успешную аутентификацию
+            DateTime? previousLogin = FindPreviousAuthentication(sid);
+
+            if (previousLogin.HasValue)
+            {
+                ShowLastAuthentication(
+                    username,
+                    previousLogin.Value
+                );
+            }
+
+            // ВАЖНО:
+            // Здесь мы больше НЕ записываем DateTime.Now.
+            //
+            // Время последней аутентификации берётся
+            // непосредственно из Security Event Log.
+        }
+
+        private DateTime? FindPreviousAuthentication(string sid)
+        {
+            try
+            {
+                string query = $@"
+                    <QueryList>
+                        <Query Id=""0"" Path=""Security"">
+                            <Select Path=""Security"">
+                                *[System[
+                                    EventID=4624
+                                ]]
+                                and
+                                *[EventData[
+                                    Data[@Name='TargetUserSid'] = '{sid}'
+                                ]]
+                            </Select>
+                        </Query>
+                    </QueryList>";
+
+                EventLogQuery eventQuery = new EventLogQuery(
+                    "Security",
+                    PathType.LogName,
+                    query
+                );
+
+                using EventLogReader reader =
+                    new EventLogReader(eventQuery);
+
+                EventRecord? eventRecord;
+
+                // Пропускаем самый последний 4624.
+                //
+                // При запуске программы непосредственно после
+                // входа в Windows последний event 4624 является
+                // текущим входом.
+                //
+                // Следующий event — предыдущий вход.
+
+                eventRecord = reader.ReadEvent();
+
+                if (eventRecord == null)
+                {
+                    return null;
+                }
+
+                eventRecord.Dispose();
+
+                // Теперь читаем предыдущий 4624
+                eventRecord = reader.ReadEvent();
+
+                if (eventRecord == null)
+                {
+                    return null;
+                }
+
+                DateTime? time = eventRecord.TimeCreated;
+
+                eventRecord.Dispose();
+
+                return time;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show(
+                    "Нет доступа к журналу Security.\n\n" +
+                    "Для чтения событий безопасности программе " +
+                    "могут потребоваться соответствующие права.",
+                    "Last Authentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Ошибка чтения журнала Security:\n\n" +
+                    ex.Message,
+                    "Last Authentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+
+                return null;
+            }
+        }
+
+        private void ShowLastAuthentication(
+            string username,
+            DateTime authenticationTime)
+        {
+            MessageBox.Show(
+                $"Пользователь:\n{username}\n\n" +
+                $"Последняя успешная аутентификация:\n" +
+                $"{authenticationTime:dd.MM.yyyy HH:mm:ss}",
+                "Последняя аутентификация",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
         }
     }
 }
