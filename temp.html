@@ -20,12 +20,20 @@ namespace LastAuthentication
 
         public AuthenticationManager()
         {
+            // Хранилище конкретного пользователя.
+            // Например:
+            // C:\Users\Alex\AppData\Local\LastAuthentication
+
             dataDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
                 "LastAuthentication"
             );
 
-            dataFile = Path.Combine(dataDirectory, "authentication.json");
+            dataFile = Path.Combine(
+                dataDirectory,
+                "authentication.json"
+            );
 
             Directory.CreateDirectory(dataDirectory);
         }
@@ -37,16 +45,19 @@ namespace LastAuthentication
             string sid = identity.User?.Value ?? "";
             string username = identity.Name;
 
-            AuthenticationData? previousData = LoadData();
-
             DateTime currentLogin = DateTime.Now;
 
+            AuthenticationData? previousData = LoadData();
+
+            // Если это не первый вход данного пользователя,
+            // показываем информацию о предыдущем входе.
             if (previousData != null &&
                 previousData.Sid == sid)
             {
                 ShowLastAuthentication(previousData);
             }
 
+            // Записываем текущий вход как последний.
             AuthenticationData currentData = new AuthenticationData
             {
                 Sid = sid,
@@ -102,7 +113,7 @@ namespace LastAuthentication
         private void ShowLastAuthentication(AuthenticationData data)
         {
             MessageBox.Show(
-                $"Пользователь: {data.Username}\n\n" +
+                $"Пользователь:\n{data.Username}\n\n" +
                 $"Последняя успешная аутентификация:\n" +
                 $"{data.LastAuthentication:dd.MM.yyyy HH:mm:ss}",
                 "Последняя аутентификация",
