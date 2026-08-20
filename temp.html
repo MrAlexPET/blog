@@ -1,20 +1,114 @@
 using System;
+using System.IO;
+using System.Security.Principal;
+using System.Text.Json;
 using System.Windows.Forms;
 
 namespace LastAuthentication
 {
-    internal static class Program
+    public class AuthenticationData
     {
-        [STAThread]
-        static void Main()
+        public string Sid { get; set; } = "";
+        public string Username { get; set; } = "";
+        public DateTime LastAuthentication { get; set; }
+    }
+
+    public class AuthenticationManager
+    {
+        private readonly string dataDirectory;
+        private readonly string dataFile;
+
+        public AuthenticationManager()
         {
-            ApplicationConfiguration.Initialize();
+            dataDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "LastAuthentication"
+            );
 
-            AuthenticationManager manager = new AuthenticationManager();
+            dataFile = Path.Combine(dataDirectory, "authentication.json");
 
-            manager.ProcessLogin();
+            Directory.CreateDirectory(dataDirectory);
+        }
 
-            Application.Run();
+        public void ProcessLogin()
+        {
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+
+            string sid = identity.User?.Value ?? "";
+            string username = identity.Name;
+
+            AuthenticationData? previousData = LoadData();
+
+            DateTime currentLogin = DateTime.Now;
+
+            if (previousData != null &&
+                previousData.Sid == sid)
+            {
+                ShowLastAuthentication(previousData);
+            }
+
+            AuthenticationData currentData = new AuthenticationData
+            {
+                Sid = sid,
+                Username = username,
+                LastAuthentication = currentLogin
+            };
+
+            SaveData(currentData);
+        }
+
+        private AuthenticationData? LoadData()
+        {
+            try
+            {
+                if (!File.Exists(dataFile))
+                    return null;
+
+                string json = File.ReadAllText(dataFile);
+
+                return JsonSerializer.Deserialize<AuthenticationData>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void SaveData(AuthenticationData data)
+        {
+            try
+            {
+                string json = JsonSerializer.Serialize(
+                    data,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+
+                File.WriteAllText(dataFile, json);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Не удалось сохранить информацию о входе.\n\n" +
+                    ex.Message,
+                    "Last Authentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+        }
+
+        private void ShowLastAuthentication(AuthenticationData data)
+        {
+            MessageBox.Show(
+                $"Пользователь: {data.Username}\n\n" +
+                $"Последняя успешная аутентификация:\n" +
+                $"{data.LastAuthentication:dd.MM.yyyy HH:mm:ss}",
+                "Последняя аутентификация",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
         }
     }
 }
