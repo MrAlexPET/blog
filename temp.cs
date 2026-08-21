@@ -1,242 +1,218 @@
 using System;
-using System.Diagnostics.Eventing.Reader;
 using System.Security.Principal;
-using System.Xml.Linq;
+using System.Windows.Forms;
 
 namespace LastAuthentication
 {
-    public enum LoginType
+    public class AuthenticationManager
     {
-        Unknown,
-        Local,
-        Rdp
-    }
+        private readonly LoginDetector _detector;
+        private readonly LoginStorage _storage;
+        private readonly StartupManager _startup;
 
-    public class LoginInfo
-    {
-        public DateTime Time { get; set; }
+        public AuthenticationManager()
+        {
+            _detector =
+                new LoginDetector();
 
-        public LoginType Type { get; set; }
+            _storage =
+                new LoginStorage();
 
-        public string LogonId { get; set; } = "";
+            _startup =
+                new StartupManager();
+        }
 
-        public int WindowsSessionId { get; set; }
-    }
-
-    public class LoginDetector
-    {
-        public LoginInfo? FindCurrentLogin()
+        public void Run(string[] args)
         {
             WindowsIdentity identity =
                 WindowsIdentity.GetCurrent();
+
+            string username =
+                identity.Name;
 
             string sid =
                 identity.User?.Value ?? "";
 
             if (string.IsNullOrEmpty(sid))
-                return null;
+            {
+                return;
+            }
 
-            string query = @"
-                <QueryList>
-                    <Query Id=""0"" Path=""Security"">
-                        <Select Path=""Security"">
-                            *[System[EventID=4624]]
-                        </Select>
-                    </Query>
-                </QueryList>";
+            /*
+             * --test
+             *
+             * Ручной тест программы.
+             */
+            if (Array.Exists(
+                args,
+                x => string.Equals(
+                    x,
+                    "--test",
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                RunTest(
+                    username,
+                    sid
+                );
 
-            EventLogQuery eventQuery =
-                new EventLogQuery(
-                    "Security",
-                    PathType.LogName,
-                    query
-                )
+                return;
+            }
+
+            /*
+             * Добавляем программу
+             * в автозапуск.
+             */
+            _startup.EnableStartup();
+
+            /*
+             * Ищем текущую аутентификацию.
+             */
+            LoginInfo? currentLogin =
+                _detector.FindCurrentLogin();
+
+            if (currentLogin == null)
+            {
+                return;
+            }
+
+            /*
+             * Получаем последнее сохранённое
+             * время входа.
+             */
+            DateTime? previousLogin =
+                _storage.GetLastLogin(sid);
+
+            /*
+             * Если это первый запуск,
+             * просто сохраняем время.
+             */
+            if (!previousLogin.HasValue)
+            {
+                _storage.SaveLogin(
+                    sid,
+                    currentLogin.Time
+                );
+
+                return;
+            }
+
+            /*
+             * Показываем пользователю
+             * предыдущий вход.
+             */
+            ShowLastLogin(
+                username,
+                previousLogin.Value,
+                currentLogin.Type
+            );
+
+            /*
+             * После закрытия окна
+             * сохраняем текущий вход.
+             */
+            _storage.SaveLogin(
+                sid,
+                currentLogin.Time
+            );
+
+            /*
+             * Программа заканчивает работу.
+             */
+        }
+
+        private void ShowLastLogin(
+            string username,
+            DateTime previousLogin,
+            LoginType currentLoginType)
+        {
+            string loginTypeText =
+                currentLoginType switch
                 {
-                    ReverseDirection = true
+                    LoginType.Rdp =>
+                        "Удалённый вход (RDP)",
+
+                    LoginType.Local =>
+                        "Локальный вход",
+
+                    _ =>
+                        "Вход"
                 };
 
-            using EventLogReader reader =
-                new EventLogReader(eventQuery);
+            MessageBox.Show(
+                $"Пользователь:\n{username}\n\n" +
 
-            EventRecord? record;
+                $"Последняя успешная " +
+                $"аутентификация:\n" +
 
-            int checkedEvents = 0;
+                $"{previousLogin:dd.MM.yyyy HH:mm:ss}\n\n" +
 
-            while (
-                (record = reader.ReadEvent()) != null &&
-                checkedEvents < 100)
-            {
-                try
-                {
-                    checkedEvents++;
+                $"Текущий тип входа:\n" +
 
-                    if (!record.TimeCreated.HasValue)
-                        continue;
+                $"{loginTypeText}",
 
-                    string xml =
-                        record.ToXml();
+                "Последняя аутентификация",
 
-                    AuthenticationEvent eventInfo =
-                        ParseEvent(xml);
+                MessageBoxButtons.OK,
 
-                    if (!string.Equals(
-                        eventInfo.TargetUserSid,
-                        sid,
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    LoginType? type =
-                        ConvertLogonType(
-                            eventInfo.LogonType
-                        );
-
-                    if (!type.HasValue)
-                        continue;
-
-                    return new LoginInfo
-                    {
-                        Time =
-                            record.TimeCreated.Value,
-
-                        Type =
-                            type.Value,
-
-                        LogonId =
-                            eventInfo.TargetLogonId,
-
-                        WindowsSessionId =
-                            GetCurrentSessionId()
-                    };
-                }
-                finally
-                {
-                    record.Dispose();
-                }
-            }
-
-            return null;
+                MessageBoxIcon.Information
+            );
         }
 
-        private LoginType? ConvertLogonType(
-            int logonType)
+        private void RunTest(
+            string username,
+            string sid)
         {
-            switch (logonType)
+            LoginInfo? login =
+                _detector.FindCurrentLogin();
+
+            if (login == null)
             {
-                /*
-                 * На твоём ПК локальный вход
-                 * фиксируется как CachedInteractive.
-                 */
-                case 11:
-                    return LoginType.Local;
+                MessageBox.Show(
+                    "Текущая аутентификация " +
+                    "не найдена.",
+                    "Тест",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
 
-                /*
-                 * Обычный Interactive.
-                 */
-                case 2:
-                    return LoginType.Local;
-
-                /*
-                 * Remote Interactive = RDP.
-                 */
-                case 10:
-                    return LoginType.Rdp;
-
-                /*
-                 * Cached Remote Interactive.
-                 */
-                case 12:
-                    return LoginType.Rdp;
-
-                default:
-                    return null;
-            }
-        }
-
-        private int GetCurrentSessionId()
-        {
-            try
-            {
-                return
-                    System.Diagnostics.Process
-                        .GetCurrentProcess()
-                        .SessionId;
-            }
-            catch
-            {
-                return -1;
-            }
-        }
-
-        private AuthenticationEvent
-            ParseEvent(string xml)
-        {
-            AuthenticationEvent result =
-                new AuthenticationEvent();
-
-            try
-            {
-                XDocument document =
-                    XDocument.Parse(xml);
-
-                XNamespace ns =
-                    "http://schemas.microsoft.com/win/2004/08/events/event";
-
-                foreach (
-                    XElement data
-                    in document.Descendants(ns + "Data"))
-                {
-                    string? name =
-                        data.Attribute("Name")?.Value;
-
-                    string value =
-                        data.Value;
-
-                    switch (name)
-                    {
-                        case "TargetUserSid":
-
-                            result.TargetUserSid =
-                                value;
-
-                            break;
-
-                        case "TargetLogonId":
-
-                            result.TargetLogonId =
-                                value;
-
-                            break;
-
-                        case "LogonType":
-
-                            if (int.TryParse(
-                                value,
-                                out int type))
-                            {
-                                result.LogonType =
-                                    type;
-                            }
-
-                            break;
-                    }
-                }
-            }
-            catch
-            {
+                return;
             }
 
-            return result;
-        }
+            DateTime? previous =
+                _storage.GetLastLogin(sid);
 
-        private class AuthenticationEvent
-        {
-            public string TargetUserSid { get; set; } = "";
+            string message =
+                $"Пользователь:\n{username}\n\n" +
 
-            public string TargetLogonId { get; set; } = "";
+                $"SID:\n{sid}\n\n" +
 
-            public int LogonType { get; set; } = -1;
+                $"Текущий вход:\n" +
+
+                $"{login.Time:dd.MM.yyyy HH:mm:ss.fff}\n\n" +
+
+                $"Тип:\n" +
+
+                $"{login.Type}\n\n" +
+
+                $"Logon ID:\n" +
+
+                $"{login.LogonId}\n\n" +
+
+                $"Предыдущий сохранённый вход:\n" +
+
+                (
+                    previous.HasValue
+                        ? previous.Value.ToString(
+                            "dd.MM.yyyy HH:mm:ss.fff")
+                        : "НЕТ"
+                );
+
+            MessageBox.Show(
+                message,
+                "Last Authentication - TEST",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
         }
     }
 }
