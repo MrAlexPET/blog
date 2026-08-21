@@ -1,16 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+dotnet remove package Microsoft.Extensions.Hosting.WindowsServices
+dotnet remove package Microsoft.Extensions.Hosting
+dotnet remove package Microsoft.Extensions.Logging.EventLog
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+dotnet remove package Microsoft.Extensions.Hosting.WindowsServices
+dotnet remove package Microsoft.Extensions.Hosting
+dotnet remove package Microsoft.Extensions.Logging.EventLog
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging.EventLog" Version="8.0.1" />
-  </ItemGroup>
+dotnet add package Microsoft.Extensions.Hosting.WindowsServices --version 8.0.1
 
-</Project>
+dotnet add package Microsoft.Extensions.Logging.EventLog --version 8.0.1
