@@ -1,1 +1,1 @@
-.\LastAuthentication.Service\bin\Release\net8.0-windows\win-x64\publish\LastAuthentication.Service.exe
+sc.exe create LastAuthenticationService binPath= "\"$PWD\LastAuthentication.Service.exe\"" start= auto obj= LocalSystem
