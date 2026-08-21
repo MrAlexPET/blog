@@ -1,1 +1,1 @@
-LastAuthentication\LastAuthentication.Service\Worker.cs(3,23): error CS0246: Не удалось найти тип или имя пространства имен "BackgroundService" (возможно, отсутствует директива using или ссылка на сборку).
+dotnet publish LastAuthentication.Service -c Release -r win-x64 --self-contained true
