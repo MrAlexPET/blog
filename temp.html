@@ -1,36 +1,197 @@
-На моем ПК:
-Вход после выхода из УЗ:
-9:02:17 - 11
-9:02:17 - 11
-9:02:17 - 7
-9:02:17 - 7
+Тест А:
+===== SECURITY 4624 =====
 
-Вход после выхода из УЗ (2й раз):
-9:05:36 - 11
-9:05:36 - 11
-9:05:36 - 7
-9:05:36 - 7
+#1
+Time: 21.08.2026 09:49:44.653
+Logon Type: 7
+Target Logon ID: 0xc1ddf8
+Linked Logon ID: 
+Logon Process: Negotiat
+----------------------------------------
+#2
+Time: 21.08.2026 09:49:44.653
+Logon Type: 7
+Target Logon ID: 0xc1da36
+Linked Logon ID: 
+Logon Process: Negotiat
+----------------------------------------
+#3
+Time: 21.08.2026 09:49:44.615
+Logon Type: 11
+Target Logon ID: 0xc1d9c9
+Linked Logon ID: 
+Logon Process: User32 
+----------------------------------------
+#4
+Time: 21.08.2026 09:49:44.615
+Logon Type: 11
+Target Logon ID: 0xc1d95f
+Linked Logon ID: 
+Logon Process: User32 
 
-Перезагрузка:
-9:07:53 - 11
-9:07:53 - 11
-9:07:53 - 7
-9:07:53 - 7
+Тест B:
+===== SECURITY 4624 =====
 
-заблокировал пк с помощью win + l и перешел на другой пк.
+#1
+Time: 21.08.2026 09:56:50.571
+Logon Type: 7
+Target Logon ID: 0xeb3cda
+Linked Logon ID: 
+Logon Process: Negotiat
+----------------------------------------
+#2
+Time: 21.08.2026 09:56:50.571
+Logon Type: 7
+Target Logon ID: 0xeb345f
+Linked Logon ID: 
+Logon Process: Negotiat
+----------------------------------------
+#3
+Time: 21.08.2026 09:56:50.520
+Logon Type: 7
+Target Logon ID: 0xeb2d57
+Linked Logon ID: 
+Logon Process: User32 
+----------------------------------------
+#4
+Time: 21.08.2026 09:56:50.520
+Logon Type: 7
+Target Logon ID: 0xeb2d28
+Linked Logon ID: 
+Logon Process: User32 
+----------------------------------------
+#5
+Time: 21.08.2026 09:56:48.368
+Logon Type: 3
+Target Logon ID: 0xe95e40
+Linked Logon ID: 
+Logon Process: NtLmSsp 
+----------------------------------------
+#6
+Time: 21.08.2026 09:56:24.763
+Logon Type: 3
+Target Logon ID: 0xe88570
+Linked Logon ID: 
+Logon Process: NtLmSsp 
+----------------------------------------
+===== RDP SESSION EVENTS =====
 
-На другом пк подключение по RDP к моему ПК:
-9:13:42 - 11
-9:13:44 - 11
-9:13:47 - 7
-9:13:47 - 7
-9:13:47 - 7
-9:13:47 - 7
+#1
+Time: 21.08.2026 09:56:50.091
+Event ID: 25
+Record ID: 4896
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#2
+Time: 21.08.2026 09:56:48.906
+Event ID: 59
+Record ID: 4895
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#3
+Time: 21.08.2026 09:56:48.906
+Event ID: 59
+Record ID: 4894
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#4
+Time: 21.08.2026 09:56:48.517
+Event ID: 24
+Record ID: 4893
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#5
+Time: 21.08.2026 09:56:48.376
+Event ID: 40
+Record ID: 4892
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#6
+Time: 21.08.2026 09:54:35.138
+Event ID: 59
+Record ID: 4891
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#7
+Time: 21.08.2026 09:54:35.138
+Event ID: 59
+Record ID: 4890
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
 
-отключился выходом уз из системы
 
-Снова подключаюсь по RDP (но уже уз на моем пк вышла из системы, а не просто заблокирован экран через win + l):
-9:17:16 - 3
-9:17:17 - 3
-9:17:18 - 10
-9:17:18 - 10
+Тест C:
+===== SECURITY 4624 =====
+
+#1
+Time: 21.08.2026 10:02:16.330
+Logon Type: 10
+Target Logon ID: 0xfadf4d
+Linked Logon ID: 
+Logon Process: User32 
+----------------------------------------
+#2
+Time: 21.08.2026 10:02:16.330
+Logon Type: 10
+Target Logon ID: 0xfadd5c
+Linked Logon ID: 
+Logon Process: User32 
+----------------------------------------
+#3
+Time: 21.08.2026 10:02:15.731
+Logon Type: 3
+Target Logon ID: 0xfa48f8
+Linked Logon ID: 
+Logon Process: NtLmSsp 
+----------------------------------------
+#4
+Time: 21.08.2026 10:02:14.157
+Logon Type: 3
+Target Logon ID: 0xfa3c1f
+Linked Logon ID: 
+Logon Process: NtLmSsp 
+----------------------------------------
+===== RDP SESSION EVENTS =====
+
+#1
+Time: 21.08.2026 10:02:16.603
+Event ID: 22
+Record ID: 4903
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#2
+Time: 21.08.2026 10:02:16.492
+Event ID: 21
+Record ID: 4902
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#3
+Time: 21.08.2026 10:02:16.383
+Event ID: 42
+Record ID: 4901
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#4
+Time: 21.08.2026 10:02:16.379
+Event ID: 41
+Record ID: 4900
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#5
+Time: 21.08.2026 10:01:56.548
+Event ID: 24
+Record ID: 4899
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#6
+Time: 21.08.2026 10:01:56.377
+Event ID: 40
+Record ID: 4898
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
+#7
+Time: 21.08.2026 10:01:56.140
+Event ID: 23
+Record ID: 4897
+Provider: Microsoft-Windows-TerminalServices-LocalSessionManager
+----------------------------------------
