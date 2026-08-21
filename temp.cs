@@ -1,101 +1,86 @@
+using Microsoft.Win32;
 using System;
+using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
 
 namespace LastAuthentication
 {
-    public class LoginStorage
+    public class StartupManager
     {
-        private readonly string _directory;
+        private const string RunKey =
+            @"Software\Microsoft\Windows\CurrentVersion\Run";
 
-        public LoginStorage()
-        {
-            _directory = Path.Combine(
-                Environment.GetFolderPath(
-                    Environment.SpecialFolder.CommonApplicationData
-                ),
-                "LastAuthentication"
-            );
+        private const string AppName =
+            "LastAuthentication";
 
-            Directory.CreateDirectory(_directory);
-        }
-
-        private string GetFilePath(string sid)
-        {
-            string safeSid =
-                sid.Replace("\\", "_")
-                   .Replace("/", "_");
-
-            return Path.Combine(
-                _directory,
-                safeSid + ".json"
-            );
-        }
-
-        public DateTime? GetLastLogin(string sid)
+        public void EnableStartup()
         {
             try
             {
-                string path = GetFilePath(sid);
+                string exePath =
+                    Process.GetCurrentProcess()
+                        .MainModule!
+                        .FileName!;
 
-                if (!File.Exists(path))
-                    return null;
-
-                string json =
-                    File.ReadAllText(path);
-
-                LoginRecord? record =
-                    JsonSerializer.Deserialize<LoginRecord>(
-                        json
+                using RegistryKey? key =
+                    Registry.CurrentUser.OpenSubKey(
+                        RunKey,
+                        writable: true
                     );
 
-                return record?.LastLogin;
-            }
-            catch
-            {
-                return null;
-            }
-        }
+                if (key == null)
+                    return;
 
-        public void SaveLogin(
-            string sid,
-            DateTime loginTime)
-        {
-            try
-            {
-                string path =
-                    GetFilePath(sid);
-
-                LoginRecord record =
-                    new LoginRecord
-                    {
-                        LastLogin = loginTime
-                    };
-
-                string json =
-                    JsonSerializer.Serialize(
-                        record,
-                        new JsonSerializerOptions
-                        {
-                            WriteIndented = true
-                        }
-                    );
-
-                File.WriteAllText(
-                    path,
-                    json
+                key.SetValue(
+                    AppName,
+                    $"\"{exePath}\""
                 );
             }
             catch
             {
-                // Не ломаем вход пользователя,
-                // если запись не удалась.
+                // Ничего не делаем.
             }
         }
 
-        private class LoginRecord
+        public void DisableStartup()
         {
-            public DateTime LastLogin { get; set; }
+            try
+            {
+                using RegistryKey? key =
+                    Registry.CurrentUser.OpenSubKey(
+                        RunKey,
+                        writable: true
+                    );
+
+                key?.DeleteValue(
+                    AppName,
+                    throwOnMissingValue: false
+                );
+            }
+            catch
+            {
+            }
+        }
+
+        public bool IsStartupEnabled()
+        {
+            try
+            {
+                using RegistryKey? key =
+                    Registry.CurrentUser.OpenSubKey(
+                        RunKey,
+                        writable: false
+                    );
+
+                object? value =
+                    key?.GetValue(AppName);
+
+                return value != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
