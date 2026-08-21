@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics.Eventing.Reader;
 using System.Security.Principal;
+using System.Text;
 using System.Xml.Linq;
 using System.Windows.Forms;
 
@@ -12,55 +13,66 @@ namespace LastAuthentication
         {
             try
             {
-                WindowsIdentity identity = WindowsIdentity.GetCurrent();
+                WindowsIdentity identity =
+                    WindowsIdentity.GetCurrent();
 
-                string sid = identity.User?.Value ?? "";
                 string username = identity.Name;
+                string sid = identity.User?.Value ?? "UNKNOWN";
 
-                if (string.IsNullOrEmpty(sid))
-                {
-                    MessageBox.Show(
-                        "Не удалось определить SID текущего пользователя.",
-                        "Last Authentication",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
+                int sessionId =
+                    GetCurrentSessionId();
 
-                    return;
-                }
+                StringBuilder report =
+                    new StringBuilder();
 
-                DateTime? previousLogin =
-                    FindPreviousAuthentication(sid);
-
-                // Временная диагностика
-                MessageBox.Show(
-                    $"Пользователь: {username}\n\n" +
-                    $"SID:\n{sid}\n\n" +
-                    $"Предыдущая аутентификация:\n" +
-                    (
-                        previousLogin.HasValue
-                            ? previousLogin.Value.ToString(
-                                "dd.MM.yyyy HH:mm:ss")
-                            : "НЕ НАЙДЕНО"
-                    ),
-                    "DEBUG",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
+                report.AppendLine(
+                    "===== CURRENT USER ====="
                 );
 
-                if (previousLogin.HasValue)
-                {
-                    ShowLastAuthentication(
-                        username,
-                        previousLogin.Value
-                    );
-                }
+                report.AppendLine(
+                    $"Username: {username}"
+                );
+
+                report.AppendLine(
+                    $"SID: {sid}"
+                );
+
+                report.AppendLine(
+                    $"Session ID: {sessionId}"
+                );
+
+                report.AppendLine();
+
+                report.AppendLine(
+                    "===== SECURITY 4624 ====="
+                );
+
+                report.AppendLine();
+
+                ReadSecurityEvents(
+                    sid,
+                    report
+                );
+
+                report.AppendLine();
+
+                report.AppendLine(
+                    "===== RDP SESSION EVENTS ====="
+                );
+
+                report.AppendLine();
+
+                ReadRdpEvents(
+                    username,
+                    report
+                );
+
+                ShowReport(report.ToString());
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Произошла ошибка:\n\n" +
-                    ex,
+                    "Ошибка:\n\n" + ex,
                     "Last Authentication",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
@@ -68,17 +80,26 @@ namespace LastAuthentication
             }
         }
 
-        private DateTime? FindPreviousAuthentication(string currentSid)
+        private int GetCurrentSessionId()
         {
             try
             {
-                /*
-                 * Получаем последние события 4624.
-                 *
-                 * Здесь намеренно НЕ фильтруем SID через XPath.
-                 * Мы будем самостоятельно разбирать каждое событие.
-                 */
+                return System.Diagnostics.Process
+                    .GetCurrentProcess()
+                    .SessionId;
+            }
+            catch
+            {
+                return -1;
+            }
+        }
 
+        private void ReadSecurityEvents(
+            string currentSid,
+            StringBuilder report)
+        {
+            try
+            {
                 string query = @"
                     <QueryList>
                         <Query Id=""0"" Path=""Security"">
@@ -88,52 +109,37 @@ namespace LastAuthentication
                         </Query>
                     </QueryList>";
 
-                EventLogQuery eventQuery = new EventLogQuery(
-                    "Security",
-                    PathType.LogName,
-                    query
-                )
-                {
-                    ReverseDirection = true
-                };
+                EventLogQuery queryObject =
+                    new EventLogQuery(
+                        "Security",
+                        PathType.LogName,
+                        query
+                    )
+                    {
+                        ReverseDirection = true
+                    };
 
                 using EventLogReader reader =
-                    new EventLogReader(eventQuery);
+                    new EventLogReader(queryObject);
 
-                EventRecord? eventRecord;
+                EventRecord? record;
 
-                DateTime programStart = DateTime.Now;
+                int counter = 0;
 
-                bool currentLoginFound = false;
-
-                while ((eventRecord = reader.ReadEvent()) != null)
+                while (
+                    (record = reader.ReadEvent()) != null &&
+                    counter < 30)
                 {
                     try
                     {
-                        if (!eventRecord.TimeCreated.HasValue)
+                        if (!record.TimeCreated.HasValue)
                             continue;
 
-                        string xml = eventRecord.ToXml();
+                        string xml =
+                            record.ToXml();
 
                         AuthenticationEventInfo info =
                             ParseAuthenticationEvent(xml);
-
-                        /*
-                         * Нас интересуют только:
-                         *
-                         * LogonType 2  = обычный вход
-                         * LogonType 10 = RDP
-                         */
-
-                        if (info.LogonType != 2 &&
-                            info.LogonType != 10)
-                        {
-                            continue;
-                        }
-
-                        /*
-                         * Проверяем SID пользователя.
-                         */
 
                         if (!string.Equals(
                             info.TargetUserSid,
@@ -143,70 +149,239 @@ namespace LastAuthentication
                             continue;
                         }
 
-                        DateTime eventTime =
-                            eventRecord.TimeCreated.Value;
+                        counter++;
 
-                        /*
-                         * Если самое новое событие произошло
-                         * совсем недавно, считаем его текущим
-                         * входом.
-                         */
+                        report.AppendLine(
+                            $"#{counter}"
+                        );
 
-                        TimeSpan difference =
-                            programStart - eventTime;
+                        report.AppendLine(
+                            $"Time: {record.TimeCreated:dd.MM.yyyy HH:mm:ss.fff}"
+                        );
 
-                        if (!currentLoginFound &&
-                            difference.TotalSeconds >= 0 &&
-                            difference.TotalSeconds <= 120)
-                        {
-                            currentLoginFound = true;
-                            continue;
-                        }
+                        report.AppendLine(
+                            $"Record ID: {record.RecordId}"
+                        );
 
-                        /*
-                         * Следующее подходящее событие —
-                         * предыдущая аутентификация.
-                         */
+                        report.AppendLine(
+                            $"Logon Type: {info.LogonType}"
+                        );
 
-                        return eventTime;
+                        report.AppendLine(
+                            $"Target User: {info.TargetUserName}"
+                        );
+
+                        report.AppendLine(
+                            $"Target Domain: {info.TargetDomainName}"
+                        );
+
+                        report.AppendLine(
+                            $"Target Logon ID: {info.TargetLogonId}"
+                        );
+
+                        report.AppendLine(
+                            $"Linked Logon ID: {info.LinkedLogonId}"
+                        );
+
+                        report.AppendLine(
+                            $"Authentication Package: {info.AuthenticationPackage}"
+                        );
+
+                        report.AppendLine(
+                            $"Logon Process: {info.LogonProcess}"
+                        );
+
+                        report.AppendLine(
+                            "----------------------------------------"
+                        );
                     }
                     finally
                     {
-                        eventRecord.Dispose();
+                        record.Dispose();
                     }
                 }
 
-                return null;
+                if (counter == 0)
+                {
+                    report.AppendLine(
+                        "События 4624 для текущего SID не найдены."
+                    );
+                }
             }
             catch (UnauthorizedAccessException)
             {
-                MessageBox.Show(
-                    "Нет доступа к журналу Security.\n\n" +
-                    "Запустите VS Code или PowerShell " +
-                    "от имени администратора.",
-                    "Last Authentication",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
+                report.AppendLine(
+                    "НЕТ ДОСТУПА К SECURITY LOG."
                 );
 
-                return null;
+                report.AppendLine(
+                    "Запусти программу от имени администратора."
+                );
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    "Ошибка чтения журнала Security:\n\n" +
-                    ex,
-                    "Last Authentication",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
+                report.AppendLine(
+                    "Ошибка чтения Security Log:"
                 );
 
-                return null;
+                report.AppendLine(
+                    ex.Message
+                );
             }
         }
 
-        private AuthenticationEventInfo ParseAuthenticationEvent(
-            string xml)
+        private void ReadRdpEvents(
+            string username,
+            StringBuilder report)
+        {
+            try
+            {
+                string logName =
+                    "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational";
+
+                string query = @"
+                    <QueryList>
+                        <Query Id=""0"">
+                            <Select Path=""Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"">
+                                *
+                            </Select>
+                        </Query>
+                    </QueryList>";
+
+                EventLogQuery queryObject =
+                    new EventLogQuery(
+                        logName,
+                        PathType.LogName,
+                        query
+                    )
+                    {
+                        ReverseDirection = true
+                    };
+
+                using EventLogReader reader =
+                    new EventLogReader(queryObject);
+
+                EventRecord? record;
+
+                int counter = 0;
+
+                while (
+                    (record = reader.ReadEvent()) != null &&
+                    counter < 30)
+                {
+                    try
+                    {
+                        if (!record.TimeCreated.HasValue)
+                            continue;
+
+                        /*
+                         * Для диагностики показываем события:
+                         *
+                         * 21 = Session logon succeeded
+                         * 22 = Shell start
+                         * 23 = Session logoff
+                         * 24 = Session disconnected
+                         * 25 = Session reconnected
+                         *
+                         * Пока также покажем другие события,
+                         * чтобы увидеть, что именно пишет твоя Windows.
+                         */
+
+                        counter++;
+
+                        report.AppendLine(
+                            $"#{counter}"
+                        );
+
+                        report.AppendLine(
+                            $"Time: {record.TimeCreated:dd.MM.yyyy HH:mm:ss.fff}"
+                        );
+
+                        report.AppendLine(
+                            $"Event ID: {record.Id}"
+                        );
+
+                        report.AppendLine(
+                            $"Record ID: {record.RecordId}"
+                        );
+
+                        report.AppendLine(
+                            $"Provider: {record.ProviderName}"
+                        );
+
+                        string xml =
+                            record.ToXml();
+
+                        string? user =
+                            GetEventDataValue(
+                                xml,
+                                "UserName"
+                            );
+
+                        string? domain =
+                            GetEventDataValue(
+                                xml,
+                                "DomainName"
+                            );
+
+                        string? sessionId =
+                            GetEventDataValue(
+                                xml,
+                                "SessionID"
+                            );
+
+                        if (!string.IsNullOrEmpty(user))
+                        {
+                            report.AppendLine(
+                                $"UserName: {user}"
+                            );
+                        }
+
+                        if (!string.IsNullOrEmpty(domain))
+                        {
+                            report.AppendLine(
+                                $"DomainName: {domain}"
+                            );
+                        }
+
+                        if (!string.IsNullOrEmpty(sessionId))
+                        {
+                            report.AppendLine(
+                                $"SessionID: {sessionId}"
+                            );
+                        }
+
+                        report.AppendLine(
+                            "----------------------------------------"
+                        );
+                    }
+                    finally
+                    {
+                        record.Dispose();
+                    }
+                }
+
+                if (counter == 0)
+                {
+                    report.AppendLine(
+                        "RDP events not found."
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                report.AppendLine(
+                    "Ошибка чтения RDP Log:"
+                );
+
+                report.AppendLine(
+                    ex.Message
+                );
+            }
+        }
+
+        private AuthenticationEventInfo
+            ParseAuthenticationEvent(string xml)
         {
             AuthenticationEventInfo result =
                 new AuthenticationEventInfo();
@@ -219,7 +394,8 @@ namespace LastAuthentication
                 XNamespace ns =
                     "http://schemas.microsoft.com/win/2004/08/events/event";
 
-                foreach (XElement data
+                foreach (
+                    XElement data
                     in document.Descendants(ns + "Data"))
                 {
                     string? name =
@@ -228,59 +404,149 @@ namespace LastAuthentication
                     string value =
                         data.Value;
 
-                    if (name == "TargetUserSid")
+                    switch (name)
                     {
-                        result.TargetUserSid = value;
-                    }
-                    else if (name == "TargetUserName")
-                    {
-                        result.TargetUserName = value;
-                    }
-                    else if (name == "TargetDomainName")
-                    {
-                        result.TargetDomainName = value;
-                    }
-                    else if (name == "LogonType")
-                    {
-                        int.TryParse(
-                            value,
-                            out result.LogonType
-                        );
-                    }
-                    else if (name == "TargetLogonId")
-                    {
-                        result.TargetLogonId = value;
+                        case "TargetUserSid":
+
+                            result.TargetUserSid =
+                                value;
+
+                            break;
+
+                        case "TargetUserName":
+
+                            result.TargetUserName =
+                                value;
+
+                            break;
+
+                        case "TargetDomainName":
+
+                            result.TargetDomainName =
+                                value;
+
+                            break;
+
+                        case "LogonType":
+
+                            if (int.TryParse(
+                                value,
+                                out int logonType))
+                            {
+                                result.LogonType =
+                                    logonType;
+                            }
+
+                            break;
+
+                        case "TargetLogonId":
+
+                            result.TargetLogonId =
+                                value;
+
+                            break;
+
+                        case "LinkedLogonId":
+
+                            result.LinkedLogonId =
+                                value;
+
+                            break;
+
+                        case "AuthenticationPackageName":
+
+                            result.AuthenticationPackage =
+                                value;
+
+                            break;
+
+                        case "LogonProcessName":
+
+                            result.LogonProcess =
+                                value;
+
+                            break;
                     }
                 }
             }
             catch
             {
-                // Если событие невозможно разобрать,
-                // возвращаем пустой результат.
+                // Оставляем пустые значения.
             }
 
             return result;
         }
 
-        private void ShowLastAuthentication(
-            string username,
-            DateTime authenticationTime)
+        private string? GetEventDataValue(
+            string xml,
+            string dataName)
         {
-            MessageBox.Show(
-                $"Пользователь:\n" +
-                $"{username}\n\n" +
+            try
+            {
+                XDocument document =
+                    XDocument.Parse(xml);
 
-                $"Последняя успешная " +
-                $"аутентификация:\n" +
+                XNamespace ns =
+                    "http://schemas.microsoft.com/win/2004/08/events/event";
 
-                $"{authenticationTime:dd.MM.yyyy HH:mm:ss}",
+                foreach (
+                    XElement data
+                    in document.Descendants(ns + "Data"))
+                {
+                    string? name =
+                        data.Attribute("Name")?.Value;
 
-                "Последняя аутентификация",
+                    if (string.Equals(
+                        name,
+                        dataName,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        return data.Value;
+                    }
+                }
+            }
+            catch
+            {
+            }
 
-                MessageBoxButtons.OK,
+            return null;
+        }
 
-                MessageBoxIcon.Information
+        private void ShowReport(string report)
+        {
+            Form form = new Form();
+
+            form.Text =
+                "Last Authentication - Diagnostics";
+
+            form.Width = 900;
+            form.Height = 700;
+
+            TextBox textBox =
+                new TextBox();
+
+            textBox.Multiline = true;
+            textBox.ReadOnly = true;
+            textBox.ScrollBars =
+                ScrollBars.Both;
+
+            textBox.Dock =
+                DockStyle.Fill;
+
+            textBox.Font =
+                new System.Drawing.Font(
+                    "Consolas",
+                    10
+                );
+
+            textBox.Text =
+                report;
+
+            form.Controls.Add(
+                textBox
             );
+
+            form.ShowDialog();
         }
     }
 
@@ -293,6 +559,12 @@ namespace LastAuthentication
         public string TargetDomainName { get; set; } = "";
 
         public string TargetLogonId { get; set; } = "";
+
+        public string LinkedLogonId { get; set; } = "";
+
+        public string AuthenticationPackage { get; set; } = "";
+
+        public string LogonProcess { get; set; } = "";
 
         public int LogonType { get; set; } = -1;
     }
