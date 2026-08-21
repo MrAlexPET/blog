@@ -1,1 +1,1 @@
-dotnet build LastAuthentication.Service\LastAuthentication.Service.csproj
+LastAuthentication\LastAuthentication.Service\Worker.cs(3,23): error CS0246: Не удалось найти тип или имя пространства имен "BackgroundService" (возможно, отсутствует директива using или ссылка на сборку).
