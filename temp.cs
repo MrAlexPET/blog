@@ -1,99 +1,196 @@
-using System.Text.Json;
+using System.Diagnostics.Eventing.Reader;
+using System.Xml.Linq;
 
 namespace LastAuthentication.Service;
 
-public class LoginStorage
+public class SecurityLogMonitor
 {
-    private readonly string _directory;
+    public event Action<LoginEvent>? LoginDetected;
 
-    public LoginStorage()
+    private EventLogWatcher? _watcher;
+
+    public void Start()
     {
-        _directory = Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.CommonApplicationData),
-            "LastAuthentication");
+        string query = @"
+<QueryList>
+    <Query Id=""0"" Path=""Security"">
+        <Select Path=""Security"">
+            *[System[(EventID=4624)]]
+        </Select>
+    </Query>
+</QueryList>";
 
-        Directory.CreateDirectory(_directory);
+        EventLogQuery eventQuery =
+            new EventLogQuery(
+                "Security",
+                PathType.LogName,
+                query);
+
+        _watcher =
+            new EventLogWatcher(eventQuery);
+
+        _watcher.EventRecordWritten +=
+            OnEventRecordWritten;
+
+        _watcher.Enabled = true;
     }
 
-    private string GetFilePath(string sid)
+    public void Stop()
     {
-        string safeSid =
-            sid.Replace("\\", "_")
-               .Replace("/", "_");
+        if (_watcher == null)
+            return;
 
-        return Path.Combine(
-            _directory,
-            safeSid + ".json");
+        _watcher.Enabled = false;
+
+        _watcher.EventRecordWritten -=
+            OnEventRecordWritten;
+
+        _watcher.Dispose();
+
+        _watcher = null;
     }
 
-    public StoredLogin? Get(string sid)
+    private void OnEventRecordWritten(
+        object? sender,
+        EventRecordWrittenEventArgs e)
+    {
+        if (e.EventRecord == null)
+            return;
+
+        try
+        {
+            string xml =
+                e.EventRecord.ToXml();
+
+            LoginEvent? login =
+                ParseEvent(xml);
+
+            if (login == null)
+                return;
+
+            /*
+             * Нас интересуют только
+             * интерактивные входы.
+             */
+            if (!IsInterestingLogonType(
+                    login.LogonType))
+            {
+                return;
+            }
+
+            LoginDetected?.Invoke(login);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            e.EventRecord.Dispose();
+        }
+    }
+
+    private bool IsInterestingLogonType(
+        int logonType)
+    {
+        return
+            logonType == 2 ||
+            logonType == 10 ||
+            logonType == 11 ||
+            logonType == 12;
+    }
+
+    private LoginEvent? ParseEvent(
+        string xml)
     {
         try
         {
-            string path =
-                GetFilePath(sid);
+            XDocument document =
+                XDocument.Parse(xml);
 
-            if (!File.Exists(path))
+            XNamespace ns =
+                "http://schemas.microsoft.com/win/2004/08/events/event";
+
+            LoginEvent result =
+                new LoginEvent();
+
+            foreach (
+                XElement data
+                in document.Descendants(ns + "Data"))
+            {
+                string? name =
+                    data.Attribute("Name")?.Value;
+
+                string value =
+                    data.Value;
+
+                switch (name)
+                {
+                    case "TargetUserSid":
+                        result.TargetUserSid =
+                            value;
+                        break;
+
+                    case "TargetUserName":
+                        result.TargetUserName =
+                            value;
+                        break;
+
+                    case "TargetDomainName":
+                        result.TargetDomain =
+                            value;
+                        break;
+
+                    case "TargetLogonId":
+                        result.LogonId =
+                            value;
+                        break;
+
+                    case "LogonType":
+
+                        if (int.TryParse(
+                            value,
+                            out int type))
+                        {
+                            result.LogonType =
+                                type;
+                        }
+
+                        break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(
+                    result.TargetUserSid))
+            {
                 return null;
+            }
 
-            string json =
-                File.ReadAllText(path);
+            if (result.LogonType < 0)
+            {
+                return null;
+            }
 
-            return JsonSerializer.Deserialize<StoredLogin>(
-                json);
+            return result;
         }
         catch
         {
             return null;
         }
     }
-
-    public void Save(
-        string sid,
-        DateTime time,
-        int logonType,
-        string logonId)
-    {
-        try
-        {
-            string path =
-                GetFilePath(sid);
-
-            StoredLogin login =
-                new StoredLogin
-                {
-                    Sid = sid,
-                    LastLogin = time,
-                    LogonType = logonType,
-                    LogonId = logonId
-                };
-
-            string json =
-                JsonSerializer.Serialize(
-                    login,
-                    new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    });
-
-            File.WriteAllText(
-                path,
-                json);
-        }
-        catch
-        {
-        }
-    }
 }
 
-public class StoredLogin
+public class LoginEvent
 {
-    public string Sid { get; set; } = "";
+    public string TargetUserSid { get; set; } = "";
 
-    public DateTime LastLogin { get; set; }
+    public string TargetUserName { get; set; } = "";
+
+    public string TargetDomain { get; set; } = "";
+
+    public string LogonId { get; set; } = "";
 
     public int LogonType { get; set; }
 
-    public string LogonId { get; set; } = "";
+    public DateTime Time { get; set; } =
+        DateTime.Now;
 }
