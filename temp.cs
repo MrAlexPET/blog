@@ -1,1 +1,1 @@
-dotnet publish LastAuthentication.Service -c Release -r win-x64 --self-contained true
+.\LastAuthentication.Service\bin\Release\net8.0-windows\win-x64\publish\LastAuthentication.Service.exe
