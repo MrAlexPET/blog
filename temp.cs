@@ -1,196 +1,104 @@
-using System.Diagnostics.Eventing.Reader;
-using System.Xml.Linq;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace LastAuthentication.Service;
 
-public class SecurityLogMonitor
+public class AuthenticationService : BackgroundService
 {
-    public event Action<LoginEvent>? LoginDetected;
+    private readonly SecurityLogMonitor _monitor;
 
-    private EventLogWatcher? _watcher;
+    private readonly LoginStorage _storage;
 
-    public void Start()
+    private readonly ILogger<AuthenticationService> _logger;
+
+    public AuthenticationService(
+        SecurityLogMonitor monitor,
+        LoginStorage storage,
+        ILogger<AuthenticationService> logger)
     {
-        string query = @"
-<QueryList>
-    <Query Id=""0"" Path=""Security"">
-        <Select Path=""Security"">
-            *[System[(EventID=4624)]]
-        </Select>
-    </Query>
-</QueryList>";
-
-        EventLogQuery eventQuery =
-            new EventLogQuery(
-                "Security",
-                PathType.LogName,
-                query);
-
-        _watcher =
-            new EventLogWatcher(eventQuery);
-
-        _watcher.EventRecordWritten +=
-            OnEventRecordWritten;
-
-        _watcher.Enabled = true;
+        _monitor = monitor;
+        _storage = storage;
+        _logger = logger;
     }
 
-    public void Stop()
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
-        if (_watcher == null)
-            return;
+        _monitor.LoginDetected +=
+            OnLoginDetected;
 
-        _watcher.Enabled = false;
+        _monitor.Start();
 
-        _watcher.EventRecordWritten -=
-            OnEventRecordWritten;
-
-        _watcher.Dispose();
-
-        _watcher = null;
-    }
-
-    private void OnEventRecordWritten(
-        object? sender,
-        EventRecordWrittenEventArgs e)
-    {
-        if (e.EventRecord == null)
-            return;
+        _logger.LogInformation(
+            "LastAuthentication Service started.");
 
         try
         {
-            string xml =
-                e.EventRecord.ToXml();
-
-            LoginEvent? login =
-                ParseEvent(xml);
-
-            if (login == null)
-                return;
-
-            /*
-             * Нас интересуют только
-             * интерактивные входы.
-             */
-            if (!IsInterestingLogonType(
-                    login.LogonType))
-            {
-                return;
-            }
-
-            LoginDetected?.Invoke(login);
+            await Task.Delay(
+                Timeout.Infinite,
+                stoppingToken);
         }
-        catch
+        catch (TaskCanceledException)
         {
         }
         finally
         {
-            e.EventRecord.Dispose();
+            _monitor.Stop();
+
+            _monitor.LoginDetected -=
+                OnLoginDetected;
         }
     }
 
-    private bool IsInterestingLogonType(
-        int logonType)
-    {
-        return
-            logonType == 2 ||
-            logonType == 10 ||
-            logonType == 11 ||
-            logonType == 12;
-    }
-
-    private LoginEvent? ParseEvent(
-        string xml)
+    private void OnLoginDetected(
+        LoginEvent login)
     {
         try
         {
-            XDocument document =
-                XDocument.Parse(xml);
+            StoredLogin? previous =
+                _storage.Get(
+                    login.TargetUserSid);
 
-            XNamespace ns =
-                "http://schemas.microsoft.com/win/2004/08/events/event";
-
-            LoginEvent result =
-                new LoginEvent();
-
-            foreach (
-                XElement data
-                in document.Descendants(ns + "Data"))
+            /*
+             * Одна и та же logon-сессия
+             * может породить несколько связанных
+             * событий. Повторно её не сохраняем.
+             */
+            if (previous != null &&
+                !string.IsNullOrEmpty(
+                    previous.LogonId) &&
+                string.Equals(
+                    previous.LogonId,
+                    login.LogonId,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                string? name =
-                    data.Attribute("Name")?.Value;
-
-                string value =
-                    data.Value;
-
-                switch (name)
-                {
-                    case "TargetUserSid":
-                        result.TargetUserSid =
-                            value;
-                        break;
-
-                    case "TargetUserName":
-                        result.TargetUserName =
-                            value;
-                        break;
-
-                    case "TargetDomainName":
-                        result.TargetDomain =
-                            value;
-                        break;
-
-                    case "TargetLogonId":
-                        result.LogonId =
-                            value;
-                        break;
-
-                    case "LogonType":
-
-                        if (int.TryParse(
-                            value,
-                            out int type))
-                        {
-                            result.LogonType =
-                                type;
-                        }
-
-                        break;
-                }
+                return;
             }
 
-            if (string.IsNullOrEmpty(
-                    result.TargetUserSid))
-            {
-                return null;
-            }
+            _logger.LogInformation(
+                "Login detected: {User}, " +
+                "Type={Type}, " +
+                "Time={Time}, " +
+                "LogonId={LogonId}",
+                login.TargetUserName,
+                login.LogonType,
+                login.Time,
+                login.LogonId);
 
-            if (result.LogonType < 0)
-            {
-                return null;
-            }
-
-            return result;
+            /*
+             * Сохраняем текущий вход.
+             */
+            _storage.Save(
+                login.TargetUserSid,
+                login.Time,
+                login.LogonType,
+                login.LogonId);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            _logger.LogError(
+                ex,
+                "Error processing login.");
         }
     }
-}
-
-public class LoginEvent
-{
-    public string TargetUserSid { get; set; } = "";
-
-    public string TargetUserName { get; set; } = "";
-
-    public string TargetDomain { get; set; } = "";
-
-    public string LogonId { get; set; } = "";
-
-    public int LogonType { get; set; }
-
-    public DateTime Time { get; set; } =
-        DateTime.Now;
 }
