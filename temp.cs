@@ -1,14 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+namespace LastAuthentication.Service;
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
-  </ItemGroup>
+internal class Program
+{
+    static void Main(string[] args)
+    {
+        HostApplicationBuilder builder =
+            Host.CreateApplicationBuilder(args);
 
-</Project>
+        builder.Services.AddWindowsService(options =>
+        {
+            options.ServiceName =
+                "LastAuthentication Service";
+        });
+
+        builder.Services.AddSingleton<LoginStorage>();
+        builder.Services.AddSingleton<SecurityLogMonitor>();
+        builder.Services.AddHostedService<AuthenticationService>();
+
+        IHost host = builder.Build();
+
+        host.Run();
+    }
+}
