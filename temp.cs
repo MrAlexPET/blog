@@ -1,64 +1,131 @@
-private void RunTest(
-    string username,
-    string sid)
+using Microsoft.Win32;
+using System;
+
+namespace LastAuthentication
 {
-    LoginInfo? login =
-        _detector.FindCurrentLogin();
-
-    if (login == null)
+    public class LoginStorage
     {
-        MessageBox.Show(
-            "Текущая аутентификация " +
-            "не найдена.",
-            "Тест",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Warning
-        );
+        private const string RegistryPath =
+            @"Software\LastAuthentication";
 
-        return;
+        private const string LastLoginValue =
+            "LastLogin";
+
+        private const string LastLogonIdValue =
+            "LastLogonId";
+
+        private const string LastLogonTypeValue =
+            "LastLogonType";
+
+        public StoredLogin? GetLastLogin()
+        {
+            try
+            {
+                using RegistryKey? key =
+                    Registry.CurrentUser.OpenSubKey(
+                        RegistryPath,
+                        writable: false
+                    );
+
+                if (key == null)
+                    return null;
+
+                object? timeValue =
+                    key.GetValue(LastLoginValue);
+
+                object? logonIdValue =
+                    key.GetValue(LastLogonIdValue);
+
+                object? logonTypeValue =
+                    key.GetValue(LastLogonTypeValue);
+
+                if (timeValue == null)
+                    return null;
+
+                if (!DateTime.TryParse(
+                    timeValue.ToString(),
+                    out DateTime lastLogin))
+                {
+                    return null;
+                }
+
+                return new StoredLogin
+                {
+                    LastLogin = lastLogin,
+
+                    LastLogonId =
+                        logonIdValue?.ToString() ?? "",
+
+                    LastLogonType =
+                        int.TryParse(
+                            logonTypeValue?.ToString(),
+                            out int type)
+                            ? type
+                            : -1
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public void SaveLogin(
+            DateTime loginTime,
+            string logonId,
+            int logonType)
+        {
+            try
+            {
+                using RegistryKey key =
+                    Registry.CurrentUser.CreateSubKey(
+                        RegistryPath
+                    );
+
+                key.SetValue(
+                    LastLoginValue,
+                    loginTime.ToString("O")
+                );
+
+                key.SetValue(
+                    LastLogonIdValue,
+                    logonId
+                );
+
+                key.SetValue(
+                    LastLogonTypeValue,
+                    logonType,
+                    RegistryValueKind.DWord
+                );
+            }
+            catch
+            {
+                // Ошибка записи не должна
+                // мешать пользователю войти в систему.
+            }
+        }
+
+        public void Clear()
+        {
+            try
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(
+                    RegistryPath,
+                    throwOnMissingSubKey: false
+                );
+            }
+            catch
+            {
+            }
+        }
     }
 
-    DateTime? previous =
-        _storage.GetLastLogin(sid);
+    public class StoredLogin
+    {
+        public DateTime LastLogin { get; set; }
 
-    string message =
-        $"Пользователь:\n{username}\n\n" +
+        public string LastLogonId { get; set; } = "";
 
-        $"SID:\n{sid}\n\n" +
-
-        $"Текущий вход:\n" +
-        $"{login.Time:dd.MM.yyyy HH:mm:ss.fff}\n\n" +
-
-        $"Тип:\n" +
-        $"{login.Type}\n\n" +
-
-        $"Logon ID:\n" +
-        $"{login.LogonId}\n\n" +
-
-        $"Предыдущий сохранённый вход:\n" +
-        (
-            previous.HasValue
-                ? previous.Value.ToString(
-                    "dd.MM.yyyy HH:mm:ss.fff")
-                : "НЕТ"
-        );
-
-    MessageBox.Show(
-        message,
-        "Last Authentication - TEST",
-        MessageBoxButtons.OK,
-        MessageBoxIcon.Information
-    );
-
-    /*
-     * После показа диагностической информации
-     * сохраняем текущий вход.
-     *
-     * Поэтому следующий запуск --test
-     * уже увидит его как предыдущий.
-     */
-    _storage.SaveLogin(
-        sid,
-        login.Time
-    );
+        public int LastLogonType { get; set; } = -1;
+    }
 }
