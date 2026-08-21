@@ -1,1 +1,2 @@
-sc.exe create LastAuthenticationService binPath= "`"$exe`"" start= auto obj= LocalSystem
+Get-CimInstance Win32_Service -Filter "Name='LastAuthenticationService'" |
+    Select-Object Name, StartName, State, PathName
