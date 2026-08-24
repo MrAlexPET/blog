@@ -1,69 +1,99 @@
-using System.Security.Principal;
 using System.Text.Json;
 
-namespace LastAuthentication.UI;
+namespace LastAuthentication.Service;
 
-public class AuthenticationClient
+public class LoginStorage
 {
     private readonly string _directory;
 
-    public AuthenticationClient()
+    public LoginStorage()
     {
         _directory = Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.CommonApplicationData),
             "LastAuthentication");
+
+        Directory.CreateDirectory(_directory);
     }
 
-    public void ShowLastAuthentication()
+    private string GetFilePath(string sid)
     {
-        string sid =
-            WindowsIdentity.GetCurrent()
-                .User?
-                .Value ?? "";
+        string safeSid =
+            sid.Replace("\\", "_")
+               .Replace("/", "_");
 
-        if (string.IsNullOrEmpty(sid))
-            return;
+        return Path.Combine(
+            _directory,
+            safeSid + ".json");
+    }
 
-        string path =
-            Path.Combine(
-                _directory,
-                sid.Replace("\\", "_")
-                    .Replace("/", "_") +
-                ".json");
-
-        if (!File.Exists(path))
-            return;
-
+    public LoginHistory? Get(string sid)
+    {
         try
         {
+            string path = GetFilePath(sid);
+
+            if (!File.Exists(path))
+                return null;
+
             string json =
                 File.ReadAllText(path);
 
-            StoredLogin? login =
-                JsonSerializer.Deserialize<StoredLogin>(
-                    json);
+            return JsonSerializer.Deserialize<LoginHistory>(
+                json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
-            if (login == null)
-                return;
+    public void Save(
+        string sid,
+        DateTime currentLogin,
+        int currentLogonType,
+        string currentLogonId)
+    {
+        try
+        {
+            LoginHistory? old =
+                Get(sid);
 
-            /*
-             * Пока служба хранит только последний
-             * вход. Поэтому здесь временно
-             * показываем его.
-             */
-            MessageBox.Show(
-                $"Последняя успешная " +
-                $"аутентификация:\n\n" +
+            LoginHistory history =
+                new LoginHistory
+                {
+                    Sid = sid,
 
-                $"{login.LastLogin:dd.MM.yyyy HH:mm:ss}",
+                    PreviousLogin =
+                        old?.CurrentLogin,
 
-                "Последняя аутентификация",
+                    PreviousLogonType =
+                        old?.CurrentLogonType,
 
-                MessageBoxButtons.OK,
+                    PreviousLogonId =
+                        old?.CurrentLogonId,
 
-                MessageBoxIcon.Information
-            );
+                    CurrentLogin =
+                        currentLogin,
+
+                    CurrentLogonType =
+                        currentLogonType,
+
+                    CurrentLogonId =
+                        currentLogonId
+                };
+
+            string json =
+                JsonSerializer.Serialize(
+                    history,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+
+            File.WriteAllText(
+                GetFilePath(sid),
+                json);
         }
         catch
         {
@@ -71,13 +101,19 @@ public class AuthenticationClient
     }
 }
 
-public class StoredLogin
+public class LoginHistory
 {
     public string Sid { get; set; } = "";
 
-    public DateTime LastLogin { get; set; }
+    public DateTime? PreviousLogin { get; set; }
 
-    public int LogonType { get; set; }
+    public int? PreviousLogonType { get; set; }
 
-    public string LogonId { get; set; } = "";
+    public string? PreviousLogonId { get; set; }
+
+    public DateTime CurrentLogin { get; set; }
+
+    public int CurrentLogonType { get; set; }
+
+    public string CurrentLogonId { get; set; } = "";
 }
