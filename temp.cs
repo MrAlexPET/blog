@@ -1,90 +1,77 @@
-using System.IO.Pipes;
-using System.Security.Principal;
-using System.Text;
-using System.Text.Json;
-using System.Windows.Forms;
-
-namespace LastAuthentication.UI;
-
-public class AuthenticationClient
+private void OnLoginDetected(LoginEvent login)
 {
-    private const string PipeName = "LastAuthentication";
-
-    public void ShowLastAuthentication()
+    try
     {
-        try
+        // Нас интересуют только интерактивные входы:
+        // 10 = RDP
+        // 11 = CachedInteractive
+        //
+        // 3, 7 и остальные события игнорируем.
+        if (login.LogonType != 10 &&
+            login.LogonType != 11)
         {
-            using var pipe =
-                new NamedPipeClientStream(
-                    ".",
-                    PipeName,
-                    PipeDirection.InOut,
-                    PipeOptions.None,
-                    TokenImpersonationLevel.Impersonation);
+            return;
+        }
 
-            pipe.Connect(5000);
+        LoginHistory? previous =
+            _storage.Get(login.TargetUserSid);
 
-            using var reader =
-                new StreamReader(
-                    pipe,
-                    Encoding.UTF8);
+        /*
+         * Windows может создать несколько событий 4624
+         * для одного фактического входа.
+         *
+         * Например:
+         *
+         * 09:49:44.615 Type 11
+         * 09:49:44.615 Type 11
+         *
+         * Поэтому одинаковые входы, произошедшие
+         * практически одновременно, считаем одним входом.
+         */
+        if (previous != null)
+        {
+            bool sameType =
+                previous.CurrentLogonType ==
+                login.LogonType;
 
-            string json =
-                reader.ReadToEnd();
+            TimeSpan difference =
+                login.Time -
+                previous.CurrentLogin;
 
-            if (string.IsNullOrWhiteSpace(json))
+            if (sameType &&
+                difference >= TimeSpan.Zero &&
+                difference <= TimeSpan.FromSeconds(5))
             {
-                MessageBox.Show(
-                    "Служба не вернула данные.",
-                    "LastAuthentication",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                _logger.LogInformation(
+                    "Duplicate 4624 ignored. " +
+                    "SID={Sid}, Type={Type}, Time={Time}",
+                    login.TargetUserSid,
+                    login.LogonType,
+                    login.Time);
 
                 return;
             }
-
-            PipeResponse? response =
-                JsonSerializer.Deserialize<PipeResponse>(
-                    json);
-
-            if (response == null)
-                return;
-
-            if (!response.Success ||
-                response.PreviousLogin == null)
-            {
-                MessageBox.Show(
-                    "Предыдущая успешная аутентификация не найдена.",
-                    "LastAuthentication",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-
-                return;
-            }
-
-            MessageBox.Show(
-                $"Последняя успешная аутентификация:\n\n" +
-                $"{response.PreviousLogin:dd.MM.yyyy HH:mm:ss}",
-                "Последняя аутентификация",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"Ошибка подключения к службе:\n\n{ex.Message}",
-                "LastAuthentication",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
-        }
+
+        _logger.LogInformation(
+            "New login detected. " +
+            "User={User}, SID={Sid}, Type={Type}, Time={Time}, LogonId={LogonId}",
+            login.TargetUserName,
+            login.TargetUserSid,
+            login.LogonType,
+            login.Time,
+            login.LogonId);
+
+        _storage.Save(
+            login.TargetUserSid,
+            login.Time,
+            login.LogonType,
+            login.LogonId);
     }
-}
-
-public class PipeResponse
-{
-    public bool Success { get; set; }
-
-    public DateTime? PreviousLogin { get; set; }
-
-    public int? PreviousLogonType { get; set; }
+    catch (Exception ex)
+    {
+        _logger.LogError(
+            ex,
+            "Error processing login.");
+    }
 }
