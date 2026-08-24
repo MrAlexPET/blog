@@ -1,3 +1,7 @@
-C:\Program Files\dotnet\sdk\8.0.424\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.Publish.targets(360,5): warning MSB3026: не удалось скопировать "obj\Release\net8.0-windows\win-x64\LastAuthentication.Service.dll" в "bin\Release\net8.0-windows\win-x64\pub
-lish\LastAuthentication.Service.dll". Повторная попытка 1 начнется через 1000 мс. The process cannot access the file 'D:\Login_program\LastAuthentication\LastAuthentication.Service\bin\Release\net8.0-windows\win-x64\publish\LastAuthentication.Service.dll
-' because it is being used by another process. "LastAuthenticationService (20284)" блокирует этот файл [D:\Login_program\LastAuthentication\LastAuthentication.Service\LastAuthentication.Service.csproj]
+Get-WinEvent -LogName Application -MaxEvents 50 |
+    Where-Object {
+        $_.Message -like "*UI*" -or
+        $_.Message -like "*LastAuthentication*"
+    } |
+    Select-Object TimeCreated, Message |
+    Format-List
