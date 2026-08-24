@@ -1,6 +1,3 @@
-Get-WinEvent -LogName Application -MaxEvents 30 |
-    Where-Object {
-        $_.ProviderName -like "*LastAuthentication*"
-    } |
-    Select-Object TimeCreated, ProviderName, Message |
-    Format-List
+TimeCreated  : 24.08.2026 12:10:48
+ProviderName : LastAuthentication Service
+Message      : Service started successfully.
