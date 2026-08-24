@@ -1,119 +1,98 @@
-using System.Text.Json;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace LastAuthentication.Service;
 
-public class LoginStorage
+public class AuthenticationService : BackgroundService
 {
-    private readonly string _directory;
+    private readonly SecurityLogMonitor _monitor;
 
-    public LoginStorage()
+    private readonly LoginStorage _storage;
+
+    private readonly ILogger<AuthenticationService> _logger;
+
+    public AuthenticationService(
+        SecurityLogMonitor monitor,
+        LoginStorage storage,
+        ILogger<AuthenticationService> logger)
     {
-        _directory = Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.CommonApplicationData),
-            "LastAuthentication");
-
-        Directory.CreateDirectory(_directory);
+        _monitor = monitor;
+        _storage = storage;
+        _logger = logger;
     }
 
-    private string GetFilePath(string sid)
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
-        string safeSid =
-            sid.Replace("\\", "_")
-               .Replace("/", "_");
+        _monitor.LoginDetected +=
+            OnLoginDetected;
 
-        return Path.Combine(
-            _directory,
-            safeSid + ".json");
+        _monitor.Start();
+
+        _logger.LogInformation(
+            "LastAuthentication Service started.");
+
+        try
+        {
+            await Task.Delay(
+                Timeout.Infinite,
+                stoppingToken);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        finally
+        {
+            _monitor.Stop();
+
+            _monitor.LoginDetected -=
+                OnLoginDetected;
+        }
     }
 
-    public LoginHistory? Get(string sid)
+    private void OnLoginDetected(
+        LoginEvent login)
     {
         try
         {
-            string path = GetFilePath(sid);
+            LoginHistory? previous =
+                _storage.Get(
+                    login.TargetUserSid);
 
-            if (!File.Exists(path))
-                return null;
+            /*
+             * Если такой LogonId уже был сохранён,
+             * это повторное событие той же сессии.
+             */
+            if (previous != null &&
+                !string.IsNullOrEmpty(
+                    previous.CurrentLogonId) &&
+                string.Equals(
+                    previous.CurrentLogonId,
+                    login.LogonId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
 
-            string json =
-                File.ReadAllText(path);
+            _logger.LogInformation(
+                "Login detected: User={User}, SID={Sid}, Type={Type}, Time={Time}, LogonId={LogonId}",
+                login.TargetUserName,
+                login.TargetUserSid,
+                login.LogonType,
+                login.Time,
+                login.LogonId);
 
-            return JsonSerializer.Deserialize<LoginHistory>(
-                json);
+            _storage.Save(
+                login.TargetUserSid,
+                login.Time,
+                login.LogonType,
+                login.LogonId);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            _logger.LogError(
+                ex,
+                "Error processing login.");
         }
     }
-
-    public void Save(
-        string sid,
-        DateTime currentLogin,
-        int currentLogonType,
-        string currentLogonId)
-    {
-        try
-        {
-            LoginHistory? old =
-                Get(sid);
-
-            LoginHistory history =
-                new LoginHistory
-                {
-                    Sid = sid,
-
-                    PreviousLogin =
-                        old?.CurrentLogin,
-
-                    PreviousLogonType =
-                        old?.CurrentLogonType,
-
-                    PreviousLogonId =
-                        old?.CurrentLogonId,
-
-                    CurrentLogin =
-                        currentLogin,
-
-                    CurrentLogonType =
-                        currentLogonType,
-
-                    CurrentLogonId =
-                        currentLogonId
-                };
-
-            string json =
-                JsonSerializer.Serialize(
-                    history,
-                    new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    });
-
-            File.WriteAllText(
-                GetFilePath(sid),
-                json);
-        }
-        catch
-        {
-        }
-    }
-}
-
-public class LoginHistory
-{
-    public string Sid { get; set; } = "";
-
-    public DateTime? PreviousLogin { get; set; }
-
-    public int? PreviousLogonType { get; set; }
-
-    public string? PreviousLogonId { get; set; }
-
-    public DateTime CurrentLogin { get; set; }
-
-    public int CurrentLogonType { get; set; }
-
-    public string CurrentLogonId { get; set; } = "";
 }
