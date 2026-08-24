@@ -1,23 +1,12 @@
-private static NamedPipeServerStream CreatePipe()
-{
-    var security =
-        new PipeSecurity();
+dotnet build LastAuthentication.Service
+  Определение проектов для восстановления...
+  Все проекты обновлены для восстановления.
+D:\Login_program\LastAuthentication\LastAuthentication.Service\AuthenticationPipeServer.cs(2,23): error CS0234: Тип или имя пространства имен "AccessControl" не существует в пространстве имен "System.IO.Pipes" (возможно, отсутствует ссылка на сборку). [D
+:\Login_program\LastAuthentication\LastAuthentication.Service\LastAuthentication.Service.csproj]
 
-    security.AddAccessRule(
-        new PipeAccessRule(
-            new SecurityIdentifier(
-                WellKnownSidType.AuthenticatedUserSid,
-                null),
-            PipeAccessRights.ReadWrite,
-            System.Security.AccessControl.AccessControlType.Allow));
+Ошибка сборки.
 
-    return NamedPipeServerStreamAcl.Create(
-        PipeName,
-        PipeDirection.InOut,
-        1,
-        PipeTransmissionMode.Byte,
-        PipeOptions.Asynchronous,
-        0,
-        0,
-        security);
-}
+D:\Login_program\LastAuthentication\LastAuthentication.Service\AuthenticationPipeServer.cs(2,23): error CS0234: Тип или имя пространства имен "AccessControl" не существует в пространстве имен "System.IO.Pipes" (возможно, отсутствует ссылка на сборку). [D
+:\Login_program\LastAuthentication\LastAuthentication.Service\LastAuthentication.Service.csproj]
+    Предупреждений: 0
+    Ошибок: 1
