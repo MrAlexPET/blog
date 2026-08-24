@@ -2,171 +2,81 @@ using System.IO.Pipes;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
+using System.Windows.Forms;
 
-namespace LastAuthentication.Service;
+namespace LastAuthentication.UI;
 
-public class AuthenticationPipeServer
+public class AuthenticationClient
 {
     private const string PipeName = "LastAuthentication";
 
-    private readonly LoginStorage _storage;
-    private readonly ILogger<AuthenticationPipeServer> _logger;
-
-    public AuthenticationPipeServer(
-        LoginStorage storage,
-        ILogger<AuthenticationPipeServer> logger)
+    public void ShowLastAuthentication()
     {
-        _storage = storage;
-        _logger = logger;
-    }
-
-    public async Task StartAsync(
-        CancellationToken cancellationToken)
-    {
-        _logger.LogInformation(
-            "Authentication Pipe Server started.");
-
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            NamedPipeServerStream? pipe = null;
-
-            try
-            {
-                pipe = new NamedPipeServerStream(
+            using var pipe =
+                new NamedPipeClientStream(
+                    ".",
                     PipeName,
                     PipeDirection.InOut,
-                    1,
-                    PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous);
+                    PipeOptions.None,
+                    TokenImpersonationLevel.Impersonation);
 
-                await pipe.WaitForConnectionAsync(
-                    cancellationToken);
+            pipe.Connect(5000);
 
-                _ = HandleClientAsync(
+            using var reader =
+                new StreamReader(
                     pipe,
-                    cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                pipe?.Dispose();
-                break;
-            }
-            catch (Exception ex)
-            {
-                pipe?.Dispose();
+                    Encoding.UTF8);
 
-                _logger.LogError(
-                    ex,
-                    "Error in Named Pipe server.");
+            string json =
+                reader.ReadToEnd();
 
-                await Task.Delay(
-                    1000,
-                    cancellationToken);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                MessageBox.Show(
+                    "Служба не вернула данные.",
+                    "LastAuthentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
             }
+
+            PipeResponse? response =
+                JsonSerializer.Deserialize<PipeResponse>(
+                    json);
+
+            if (response == null)
+                return;
+
+            if (!response.Success ||
+                response.PreviousLogin == null)
+            {
+                MessageBox.Show(
+                    "Предыдущая успешная аутентификация не найдена.",
+                    "LastAuthentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                return;
+            }
+
+            MessageBox.Show(
+                $"Последняя успешная аутентификация:\n\n" +
+                $"{response.PreviousLogin:dd.MM.yyyy HH:mm:ss}",
+                "Последняя аутентификация",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
-    }
-
-    private async Task HandleClientAsync(
-        NamedPipeServerStream pipe,
-        CancellationToken cancellationToken)
-    {
-        using (pipe)
+        catch (Exception ex)
         {
-            try
-            {
-                string? sid = null;
-
-                pipe.RunAsClient(() =>
-                {
-                    using WindowsIdentity identity =
-                        WindowsIdentity.GetCurrent();
-
-                    sid = identity.User?.Value;
-                });
-
-                if (string.IsNullOrWhiteSpace(sid))
-                {
-                    _logger.LogWarning(
-                        "Could not determine client SID.");
-
-                    await SendResponseAsync(
-                        pipe,
-                        null,
-                        cancellationToken);
-
-                    return;
-                }
-
-                _logger.LogInformation(
-                    "Pipe client SID: {Sid}",
-                    sid);
-
-                LoginHistory? history =
-                    _storage.Get(sid);
-
-                if (history == null)
-                {
-                    _logger.LogInformation(
-                        "No login history found for SID {Sid}",
-                        sid);
-
-                    await SendResponseAsync(
-                        pipe,
-                        null,
-                        cancellationToken);
-
-                    return;
-                }
-
-                _logger.LogInformation(
-                    "Sending previous login {Time} for SID {Sid}",
-                    history.PreviousLogin,
-                    sid);
-
-                await SendResponseAsync(
-                    pipe,
-                    history,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Error handling Named Pipe client.");
-            }
+            MessageBox.Show(
+                $"Ошибка подключения к службе:\n\n{ex.Message}",
+                "LastAuthentication",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
-    }
-
-    private static async Task SendResponseAsync(
-        NamedPipeServerStream pipe,
-        LoginHistory? history,
-        CancellationToken cancellationToken)
-    {
-        PipeResponse response = new()
-        {
-            Success =
-                history?.PreviousLogin != null,
-
-            PreviousLogin =
-                history?.PreviousLogin,
-
-            PreviousLogonType =
-                history?.PreviousLogonType
-        };
-
-        string json =
-            JsonSerializer.Serialize(response);
-
-        byte[] data =
-            Encoding.UTF8.GetBytes(json);
-
-        await pipe.WriteAsync(
-            data,
-            cancellationToken);
-
-        await pipe.FlushAsync(
-            cancellationToken);
     }
 }
 
