@@ -1,22 +1,21 @@
-private static string? GetClientSid(
-    NamedPipeServerStream pipe)
+using Microsoft.Extensions.Hosting;
+
+namespace LastAuthentication.Service;
+
+public class PipeHostedService : BackgroundService
 {
-    try
+    private readonly AuthenticationPipeServer _server;
+
+    public PipeHostedService(
+        AuthenticationPipeServer server)
     {
-        string? sid = null;
-
-        pipe.RunAsClient(() =>
-        {
-            using WindowsIdentity identity =
-                WindowsIdentity.GetCurrent();
-
-            sid = identity.User?.Value;
-        });
-
-        return sid;
+        _server = server;
     }
-    catch
+
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
-        return null;
+        await _server.StartAsync(
+            stoppingToken);
     }
 }
