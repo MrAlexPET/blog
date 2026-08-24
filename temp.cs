@@ -1,17 +1,23 @@
-if (old != null)
+private static NamedPipeServerStream CreatePipe()
 {
-    bool sameType =
-        old.CurrentLogonType ==
-        currentLogonType;
+    var security =
+        new PipeSecurity();
 
-    TimeSpan difference =
-        currentLogin -
-        old.CurrentLogin;
+    security.AddAccessRule(
+        new PipeAccessRule(
+            new SecurityIdentifier(
+                WellKnownSidType.AuthenticatedUserSid,
+                null),
+            PipeAccessRights.ReadWrite,
+            System.Security.AccessControl.AccessControlType.Allow));
 
-    if (sameType &&
-        difference >= TimeSpan.Zero &&
-        difference <= TimeSpan.FromSeconds(5))
-    {
-        return;
-    }
+    return NamedPipeServerStreamAcl.Create(
+        PipeName,
+        PipeDirection.InOut,
+        1,
+        PipeTransmissionMode.Byte,
+        PipeOptions.Asynchronous,
+        0,
+        0,
+        security);
 }
