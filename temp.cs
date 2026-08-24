@@ -1,21 +1,37 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace LastAuthentication.Service;
 
-public class PipeHostedService : BackgroundService
+internal class Program
 {
-    private readonly AuthenticationPipeServer _server;
-
-    public PipeHostedService(
-        AuthenticationPipeServer server)
+    static void Main(string[] args)
     {
-        _server = server;
-    }
+        HostApplicationBuilder builder =
+            Host.CreateApplicationBuilder(args);
 
-    protected override async Task ExecuteAsync(
-        CancellationToken stoppingToken)
-    {
-        await _server.StartAsync(
-            stoppingToken);
+        builder.Services.AddWindowsService(options =>
+        {
+            options.ServiceName =
+                "LastAuthentication Service";
+        });
+
+        builder.Services.AddSingleton<LoginStorage>();
+
+        builder.Services.AddSingleton<SecurityLogMonitor>();
+
+        builder.Services.AddSingleton<
+            AuthenticationPipeServer>();
+
+        builder.Services.AddHostedService<
+            AuthenticationService>();
+
+        builder.Services.AddHostedService<
+            PipeHostedService>();
+
+        IHost host =
+            builder.Build();
+
+        host.Run();
     }
 }
