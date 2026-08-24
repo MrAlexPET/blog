@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace LastAuthentication.Service;
 
@@ -80,8 +81,7 @@ public static class SessionProcessLauncher
         out IntPtr ppSessionInfo,
         out int pCount);
 
-    [DllImport(
-        "wtsapi32.dll")]
+    [DllImport("wtsapi32.dll")]
     private static extern void WTSFreeMemory(
         IntPtr pMemory);
 
@@ -142,102 +142,131 @@ public static class SessionProcessLauncher
 
 
     public static bool LaunchForActiveUser(
-        string executablePath)
+        string executablePath,
+        ILogger logger)
     {
-        if (!File.Exists(executablePath))
-        {
-            throw new FileNotFoundException(
-                "UI executable not found.",
-                executablePath);
-        }
-
-        Console.WriteLine(
-            $"[SessionProcessLauncher] Searching active sessions...");
-
-        IntPtr sessionInfoPtr = IntPtr.Zero;
-
-        int count = 0;
-
-        int result =
-            WTSEnumerateSessions(
-                IntPtr.Zero,
-                0,
-                1,
-                out sessionInfoPtr,
-                out count);
-
-        if (result == 0)
-        {
-            int error =
-                Marshal.GetLastWin32Error();
-
-            throw new Win32Exception(
-                error,
-                "WTSEnumerateSessions failed.");
-        }
-
         try
         {
-            int structSize =
-                Marshal.SizeOf<WTS_SESSION_INFO>();
-
-            for (int i = 0; i < count; i++)
+            if (!File.Exists(executablePath))
             {
-                IntPtr current =
-                    IntPtr.Add(
-                        sessionInfoPtr,
-                        i * structSize);
+                logger.LogError(
+                    "UI executable not found: {Path}",
+                    executablePath);
 
-                WTS_SESSION_INFO session =
-                    Marshal.PtrToStructure<WTS_SESSION_INFO>(
-                        current);
+                return false;
+            }
 
-                Console.WriteLine(
-                    $"[SessionProcessLauncher] Session={session.SessionId}, State={session.State}");
+            logger.LogInformation(
+                "SessionProcessLauncher started. UI path: {Path}",
+                executablePath);
 
-                /*
-                 * Нас интересуют только активные
-                 * пользовательские сессии.
-                 */
-                if (session.State != WTSActive)
+            IntPtr sessionInfoPtr = IntPtr.Zero;
+
+            int count = 0;
+
+            int result =
+                WTSEnumerateSessions(
+                    IntPtr.Zero,
+                    0,
+                    1,
+                    out sessionInfoPtr,
+                    out count);
+
+            if (result == 0)
+            {
+                int error =
+                    Marshal.GetLastWin32Error();
+
+                logger.LogError(
+                    "WTSEnumerateSessions failed. Win32 error: {Error}",
+                    error);
+
+                return false;
+            }
+
+            logger.LogInformation(
+                "WTSEnumerateSessions succeeded. Sessions found: {Count}",
+                count);
+
+            try
+            {
+                int structSize =
+                    Marshal.SizeOf<WTS_SESSION_INFO>();
+
+                for (int i = 0; i < count; i++)
                 {
-                    continue;
-                }
+                    IntPtr current =
+                        IntPtr.Add(
+                            sessionInfoPtr,
+                            i * structSize);
 
-                Console.WriteLine(
-                    $"[SessionProcessLauncher] Trying session {session.SessionId}");
+                    WTS_SESSION_INFO session =
+                        Marshal.PtrToStructure<WTS_SESSION_INFO>(
+                            current);
 
-                try
-                {
-                    if (LaunchForSession(
-                            (uint)session.SessionId,
-                            executablePath))
+                    logger.LogInformation(
+                        "Session found: SessionId={SessionId}, State={State}",
+                        session.SessionId,
+                        session.State);
+
+                    if (session.State != WTSActive)
                     {
-                        return true;
+                        continue;
+                    }
+
+                    logger.LogInformation(
+                        "Trying active session {SessionId}.",
+                        session.SessionId);
+
+                    try
+                    {
+                        if (LaunchForSession(
+                                (uint)session.SessionId,
+                                executablePath,
+                                logger))
+                        {
+                            logger.LogInformation(
+                                "UI successfully launched in session {SessionId}.",
+                                session.SessionId);
+
+                            return true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(
+                            ex,
+                            "Failed to launch UI in session {SessionId}.",
+                            session.SessionId);
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(
-                        $"[SessionProcessLauncher] Session {session.SessionId} failed:");
-
-                    Console.WriteLine(ex.ToString());
-                }
             }
-        }
-        finally
-        {
-            WTSFreeMemory(
-                sessionInfoPtr);
-        }
+            finally
+            {
+                WTSFreeMemory(
+                    sessionInfoPtr);
+            }
 
-        return false;
+            logger.LogWarning(
+                "No active session could be used to launch UI.");
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Unexpected error in LaunchForActiveUser.");
+
+            return false;
+        }
     }
 
 
     private static bool LaunchForSession(
         uint sessionId,
-        string executablePath)
+        string executablePath,
+        ILogger logger)
     {
         IntPtr userToken = IntPtr.Zero;
         IntPtr primaryToken = IntPtr.Zero;
@@ -245,8 +274,9 @@ public static class SessionProcessLauncher
 
         try
         {
-            Console.WriteLine(
-                $"[SessionProcessLauncher] WTSQueryUserToken({sessionId})");
+            logger.LogInformation(
+                "Calling WTSQueryUserToken for session {SessionId}.",
+                sessionId);
 
             if (!WTSQueryUserToken(
                     sessionId,
@@ -255,14 +285,22 @@ public static class SessionProcessLauncher
                 int error =
                     Marshal.GetLastWin32Error();
 
-                throw new Win32Exception(
+                logger.LogError(
+                    "WTSQueryUserToken FAILED. Session={SessionId}, Win32 error={Error}, Message={Message}",
+                    sessionId,
                     error,
-                    $"WTSQueryUserToken failed for session {sessionId}.");
+                    new Win32Exception(error).Message);
+
+                return false;
             }
 
-            Console.WriteLine(
-                "[SessionProcessLauncher] User token acquired.");
+            logger.LogInformation(
+                "WTSQueryUserToken succeeded. Session={SessionId}.",
+                sessionId);
 
+
+            logger.LogInformation(
+                "Calling DuplicateTokenEx.");
 
             if (!DuplicateTokenEx(
                     userToken,
@@ -277,14 +315,20 @@ public static class SessionProcessLauncher
                 int error =
                     Marshal.GetLastWin32Error();
 
-                throw new Win32Exception(
+                logger.LogError(
+                    "DuplicateTokenEx FAILED. Win32 error={Error}, Message={Message}",
                     error,
-                    "DuplicateTokenEx failed.");
+                    new Win32Exception(error).Message);
+
+                return false;
             }
 
-            Console.WriteLine(
-                "[SessionProcessLauncher] Primary token created.");
+            logger.LogInformation(
+                "DuplicateTokenEx succeeded.");
 
+
+            logger.LogInformation(
+                "Calling CreateEnvironmentBlock.");
 
             if (!CreateEnvironmentBlock(
                     out environment,
@@ -294,13 +338,16 @@ public static class SessionProcessLauncher
                 int error =
                     Marshal.GetLastWin32Error();
 
-                throw new Win32Exception(
+                logger.LogError(
+                    "CreateEnvironmentBlock FAILED. Win32 error={Error}, Message={Message}",
                     error,
-                    "CreateEnvironmentBlock failed.");
+                    new Win32Exception(error).Message);
+
+                return false;
             }
 
-            Console.WriteLine(
-                "[SessionProcessLauncher] User environment created.");
+            logger.LogInformation(
+                "CreateEnvironmentBlock succeeded.");
 
 
             var startupInfo =
@@ -309,13 +356,6 @@ public static class SessionProcessLauncher
             startupInfo.cb =
                 (uint)Marshal.SizeOf<STARTUPINFO>();
 
-            /*
-             * Критически важно:
-             *
-             * это заставляет GUI-процесс работать
-             * на интерактивном пользовательском
-             * рабочем столе.
-             */
             startupInfo.lpDesktop =
                 @"winsta0\default";
 
@@ -329,15 +369,15 @@ public static class SessionProcessLauncher
             var processInfo =
                 new PROCESS_INFORMATION();
 
-
             uint creationFlags =
                 CREATE_UNICODE_ENVIRONMENT |
                 CREATE_NEW_CONSOLE;
 
 
-            Console.WriteLine(
-                $"[SessionProcessLauncher] Creating UI process: {executablePath}");
-
+            logger.LogInformation(
+                "Calling CreateProcessAsUser. Path={Path}, Session={SessionId}.",
+                executablePath,
+                sessionId);
 
             bool created =
                 CreateProcessAsUser(
@@ -360,14 +400,19 @@ public static class SessionProcessLauncher
                 int error =
                     Marshal.GetLastWin32Error();
 
-                throw new Win32Exception(
+                logger.LogError(
+                    "CreateProcessAsUser FAILED. Win32 error={Error}, Message={Message}",
                     error,
-                    "CreateProcessAsUser failed.");
+                    new Win32Exception(error).Message);
+
+                return false;
             }
 
 
-            Console.WriteLine(
-                $"[SessionProcessLauncher] UI CREATED. PID={processInfo.dwProcessId}, Session={sessionId}");
+            logger.LogInformation(
+                "PROCESS CREATED successfully. PID={Pid}, Session={SessionId}.",
+                processInfo.dwProcessId,
+                sessionId);
 
 
             CloseHandle(
@@ -376,8 +421,16 @@ public static class SessionProcessLauncher
             CloseHandle(
                 processInfo.hProcess);
 
-
             return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Exception while launching process in session {SessionId}.",
+                sessionId);
+
+            return false;
         }
         finally
         {
