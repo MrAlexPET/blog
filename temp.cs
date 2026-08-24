@@ -1,37 +1,87 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using System.IO.Pipes;
+using System.Text;
+using System.Text.Json;
+using System.Windows.Forms;
 
-namespace LastAuthentication.Service;
+namespace LastAuthentication.UI;
 
-internal class Program
+public class AuthenticationClient
 {
-    static void Main(string[] args)
+    private const string PipeName = "LastAuthentication";
+
+    public void ShowLastAuthentication()
     {
-        HostApplicationBuilder builder =
-            Host.CreateApplicationBuilder(args);
-
-        builder.Services.AddWindowsService(options =>
+        try
         {
-            options.ServiceName =
-                "LastAuthentication Service";
-        });
+            using var pipe =
+                new NamedPipeClientStream(
+                    ".",
+                    PipeName,
+                    PipeDirection.InOut);
 
-        builder.Services.AddSingleton<LoginStorage>();
+            pipe.Connect(3000);
 
-        builder.Services.AddSingleton<SecurityLogMonitor>();
+            using var reader =
+                new StreamReader(
+                    pipe,
+                    Encoding.UTF8);
 
-        builder.Services.AddSingleton<
-            AuthenticationPipeServer>();
+            string json =
+                reader.ReadToEnd();
 
-        builder.Services.AddHostedService<
-            AuthenticationService>();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                MessageBox.Show(
+                    "Служба не вернула данные.",
+                    "LastAuthentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
 
-        builder.Services.AddHostedService<
-            PipeHostedService>();
+                return;
+            }
 
-        IHost host =
-            builder.Build();
+            PipeResponse? response =
+                JsonSerializer.Deserialize<PipeResponse>(
+                    json);
 
-        host.Run();
+            if (response == null)
+                return;
+
+            if (!response.Success ||
+                response.PreviousLogin == null)
+            {
+                MessageBox.Show(
+                    "Предыдущая успешная аутентификация не найдена.",
+                    "LastAuthentication",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                return;
+            }
+
+            MessageBox.Show(
+                $"Последняя успешная аутентификация:\n\n" +
+                $"{response.PreviousLogin:dd.MM.yyyy HH:mm:ss}",
+                "Последняя аутентификация",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Ошибка подключения к службе:\n\n{ex.Message}",
+                "LastAuthentication",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
     }
+}
+
+public class PipeResponse
+{
+    public bool Success { get; set; }
+
+    public DateTime? PreviousLogin { get; set; }
+
+    public int? PreviousLogonType { get; set; }
 }
