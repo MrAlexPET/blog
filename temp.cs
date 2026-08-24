@@ -1,3 +1,6 @@
-TimeCreated  : 24.08.2026 12:10:48
-ProviderName : LastAuthentication Service
-Message      : Service started successfully.
+Get-WinEvent -LogName Application -MaxEvents 100 |
+    Where-Object {
+        $_.ProviderName -eq "LastAuthentication Service"
+    } |
+    Select-Object TimeCreated, Message |
+    Format-List
