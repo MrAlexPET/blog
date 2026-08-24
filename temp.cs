@@ -1,5 +1,1 @@
-Get-CimInstance Win32_Process |
-    Where-Object {
-        $_.Name -eq "LastAuthentication.UI.exe"
-    } |
-    Select-Object ProcessId, SessionId, ExecutablePath, CommandLine
+Get-Service LastAuthenticationService | Format-List Name,Status,StartType
