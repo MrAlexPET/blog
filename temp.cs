@@ -8,11 +8,28 @@ internal static class Program
     [STAThread]
     static void Main()
     {
-        ApplicationConfiguration.Initialize();
+        try
+        {
+            MessageBox.Show(
+                "UI ЗАПУЩЕН!",
+                "LastAuthentication DEBUG",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
 
-        AuthenticationClient client =
-            new AuthenticationClient();
+            ApplicationConfiguration.Initialize();
 
-        client.ShowLastAuthentication();
+            AuthenticationClient client =
+                new AuthenticationClient();
+
+            client.ShowLastAuthentication();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.ToString(),
+                "КРИТИЧЕСКАЯ ОШИБКА LastAuthentication.UI",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
     }
 }
