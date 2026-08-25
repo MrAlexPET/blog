@@ -1,11 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk">
+using System;
+using System.Windows.Forms;
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+namespace LastAuthentication.UI;
 
-</Project>
+internal static class Program
+{
+    [STAThread]
+    static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+
+        AuthenticationClient client =
+            new AuthenticationClient();
+
+        client.ShowLastAuthentication();
+    }
+}
