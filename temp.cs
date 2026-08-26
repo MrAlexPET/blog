@@ -1,195 +1,145 @@
-[2026-08-26 09:22:13.001] ========================================
-[2026-08-26 09:22:13.007] LaunchForActiveUser STARTED
-[2026-08-26 09:22:13.008] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:13.008] Service process ID: 11240
-[2026-08-26 09:22:13.010] Current user: EXO-PC2$
-[2026-08-26 09:22:13.010] Machine: SN78085051124
-[2026-08-26 09:22:13.011] 64-bit OS: True
-[2026-08-26 09:22:13.011] 64-bit process: True
-[2026-08-26 09:22:13.012] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:13.013] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:13.014] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:13.015] ========================================
-[2026-08-26 09:22:13.016] LaunchForActiveUser STARTED
-[2026-08-26 09:22:13.017] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:13.017] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:13.018] Session found: ID=0, State=4
-[2026-08-26 09:22:13.018] Current user: EXO-PC2$
-[2026-08-26 09:22:13.019] Machine: SN78085051124
-[2026-08-26 09:22:13.020] 64-bit OS: True
-[2026-08-26 09:22:13.021] 64-bit process: True
-[2026-08-26 09:22:13.021] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:13.022] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:13.022] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:13.023] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:13.024] Session found: ID=0, State=4
-[2026-08-26 09:22:13.024] Session found: ID=6, State=1
-[2026-08-26 09:22:13.024] Session found: ID=65536, State=6
-[2026-08-26 09:22:13.025] ERROR: No suitable session could be used.
-[2026-08-26 09:22:13.025] Launch FINISHED
-[2026-08-26 09:22:13.025] ========================================
-[2026-08-26 09:22:15.020] ========================================
-[2026-08-26 09:22:15.022] LaunchForActiveUser STARTED
-[2026-08-26 09:22:15.023] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:15.024] Service process ID: 11240
-[2026-08-26 09:22:15.025] 64-bit OS: True
-[2026-08-26 09:22:15.025] Current user: EXO-PC2$
-[2026-08-26 09:22:15.026] Machine: SN78085051124
-[2026-08-26 09:22:15.026] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:15.026] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:15.027] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:15.027] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:15.028] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:15.028] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:15.029] Session found: ID=65536, State=6
-[2026-08-26 09:22:15.029] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:15.030] Session found: ID=0, State=4
-[2026-08-26 09:22:15.030] ========================================
-[2026-08-26 09:22:15.031] Session found: ID=65536, State=6
-[2026-08-26 09:22:15.031] ERROR: No suitable session could be used.
-[2026-08-26 09:22:15.032] Launch FINISHED
-[2026-08-26 09:22:15.032] ========================================
-[2026-08-26 09:22:17.027] ========================================
-[2026-08-26 09:22:17.030] LaunchForActiveUser STARTED
-[2026-08-26 09:22:17.031] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:17.032] Service process ID: 11240
-[2026-08-26 09:22:17.033] Current user: EXO-PC2$
-[2026-08-26 09:22:17.034] Machine: SN78085051124
-[2026-08-26 09:22:17.034] 64-bit OS: True
-[2026-08-26 09:22:17.035] 64-bit process: True
-[2026-08-26 09:22:17.035] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:17.036] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:17.036] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:17.037] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:17.037] Session found: ID=0, State=4
-[2026-08-26 09:22:17.038] Session found: ID=6, State=1
-[2026-08-26 09:22:17.038] Session found: ID=65536, State=6
-[2026-08-26 09:22:17.039] ERROR: No suitable session could be used.
-[2026-08-26 09:22:17.039] Launch FINISHED
-[2026-08-26 09:22:17.040] ========================================
-[2026-08-26 09:22:17.042] ========================================
-[2026-08-26 09:22:17.042] LaunchForActiveUser STARTED
-[2026-08-26 09:22:17.043] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:17.044] Service process ID: 11240
-[2026-08-26 09:22:17.044] Current user: EXO-PC2$
-[2026-08-26 09:22:17.045] Machine: SN78085051124
-[2026-08-26 09:22:17.045] 64-bit OS: True
-[2026-08-26 09:22:17.046] 64-bit process: True
-[2026-08-26 09:22:17.047] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:17.047] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:17.047] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:17.048] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:17.048] Session found: ID=0, State=4
-[2026-08-26 09:22:17.049] Session found: ID=6, State=1
-[2026-08-26 09:22:17.049] Session found: ID=65536, State=6
-[2026-08-26 09:22:17.049] ERROR: No suitable session could be used.
-[2026-08-26 09:22:17.050] Launch FINISHED
-[2026-08-26 09:22:17.050] ========================================
-[2026-08-26 09:22:19.030] ========================================
-[2026-08-26 09:22:19.032] LaunchForActiveUser STARTED
-[2026-08-26 09:22:19.033] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:19.034] Service process ID: 11240
-[2026-08-26 09:22:19.035] Current user: EXO-PC2$
-[2026-08-26 09:22:19.036] Machine: SN78085051124
-[2026-08-26 09:22:19.037] 64-bit OS: True
-[2026-08-26 09:22:19.037] 64-bit process: True
-[2026-08-26 09:22:19.038] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:19.038] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:19.038] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:19.039] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:19.039] Session found: ID=0, State=4
-[2026-08-26 09:22:19.040] Session found: ID=6, State=1
-[2026-08-26 09:22:19.040] Session found: ID=65536, State=6
-[2026-08-26 09:22:19.040] ERROR: No suitable session could be used.
-[2026-08-26 09:22:19.041] Launch FINISHED
-[2026-08-26 09:22:19.041] ========================================
-[2026-08-26 09:22:19.060] ========================================
-[2026-08-26 09:22:19.061] LaunchForActiveUser STARTED
-[2026-08-26 09:22:19.061] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:19.062] Service process ID: 11240
-[2026-08-26 09:22:19.062] Current user: EXO-PC2$
-[2026-08-26 09:22:19.062] Machine: SN78085051124
-[2026-08-26 09:22:19.063] 64-bit OS: True
-[2026-08-26 09:22:19.063] 64-bit process: True
-[2026-08-26 09:22:19.064] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:19.064] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:19.064] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:19.065] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:19.065] Session found: ID=0, State=4
-[2026-08-26 09:22:19.066] Session found: ID=6, State=1
-[2026-08-26 09:22:19.066] Session found: ID=65536, State=6
-[2026-08-26 09:22:19.067] ERROR: No suitable session could be used.
-[2026-08-26 09:22:19.067] Launch FINISHED
-[2026-08-26 09:22:19.067] ========================================
-[2026-08-26 09:22:21.043] ========================================
-[2026-08-26 09:22:21.045] LaunchForActiveUser STARTED
-[2026-08-26 09:22:21.046] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:21.047] Service process ID: 11240
-[2026-08-26 09:22:21.048] Current user: EXO-PC2$
-[2026-08-26 09:22:21.048] Machine: SN78085051124
-[2026-08-26 09:22:21.049] 64-bit OS: True
-[2026-08-26 09:22:21.049] 64-bit process: True
-[2026-08-26 09:22:21.050] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:21.050] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:21.051] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:21.052] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:21.052] Session found: ID=0, State=4
-[2026-08-26 09:22:21.053] Session found: ID=6, State=1
-[2026-08-26 09:22:21.053] Session found: ID=65536, State=6
-[2026-08-26 09:22:21.054] ERROR: No suitable session could be used.
-[2026-08-26 09:22:21.054] Launch FINISHED
-[2026-08-26 09:22:21.055] ========================================
-[2026-08-26 09:22:21.073] ========================================
-[2026-08-26 09:22:21.074] LaunchForActiveUser STARTED
-[2026-08-26 09:22:21.075] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:21.075] Service process ID: 11240
-[2026-08-26 09:22:21.076] Current user: EXO-PC2$
-[2026-08-26 09:22:21.076] Machine: SN78085051124
-[2026-08-26 09:22:21.077] 64-bit OS: True
-[2026-08-26 09:22:21.077] 64-bit process: True
-[2026-08-26 09:22:21.078] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:21.078] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:21.078] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:21.079] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:21.079] Session found: ID=0, State=4
-[2026-08-26 09:22:21.080] Session found: ID=6, State=1
-[2026-08-26 09:22:21.080] Session found: ID=65536, State=6
-[2026-08-26 09:22:21.080] ERROR: No suitable session could be used.
-[2026-08-26 09:22:21.080] Launch FINISHED
-[2026-08-26 09:22:21.081] ========================================
-[2026-08-26 09:22:32.037] ========================================
-[2026-08-26 09:22:32.038] LaunchForActiveUser STARTED
-[2026-08-26 09:22:32.039] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:32.040] Service process ID: 11240
-[2026-08-26 09:22:32.041] Current user: EXO-PC2$
-[2026-08-26 09:22:32.042] Machine: SN78085051124
-[2026-08-26 09:22:32.042] 64-bit OS: True
-[2026-08-26 09:22:32.043] 64-bit process: True
-[2026-08-26 09:22:32.044] UI file exists. Size=151552 bytes
-[2026-08-26 09:22:32.044] UI LastWriteTime=26.08.2026 7:46:28
-[2026-08-26 09:22:32.045] Calling WTSEnumerateSessions...
-[2026-08-26 09:22:32.045] WTSEnumerateSessions OK. Sessions=3
-[2026-08-26 09:22:32.046] Session found: ID=0, State=4
-[2026-08-26 09:22:32.047] Session found: ID=6, State=0
-[2026-08-26 09:22:32.047] TARGET SESSION: 6
-[2026-08-26 09:22:32.047] --- LaunchForSession START --- Session=6
-[2026-08-26 09:22:32.049] Calling WTSQueryUserToken(6)...
-[2026-08-26 09:22:32.050] WTSQueryUserToken SUCCESS. Token=1476
-[2026-08-26 09:22:32.050] Calling DuplicateTokenEx...
-[2026-08-26 09:22:32.051] DuplicateTokenEx SUCCESS. PrimaryToken=1480
-[2026-08-26 09:22:32.052] Calling CreateEnvironmentBlock...
-[2026-08-26 09:22:32.055] CreateEnvironmentBlock SUCCESS. Environment=2660738792240
-[2026-08-26 09:22:32.056] STARTUPINFO configured. Desktop=(null, inherited)
-[2026-08-26 09:22:32.056] Calling CreateProcessAsUser...
-[2026-08-26 09:22:32.057] ApplicationName=C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
-[2026-08-26 09:22:32.057] WorkingDirectory=C:\Program Files\LastAuthentication\ui
-[2026-08-26 09:22:32.057] CreationFlags=1056
-[2026-08-26 09:22:32.117] CreateProcessAsUser SUCCESS!
-[2026-08-26 09:22:32.117] PID=11700
-[2026-08-26 09:22:32.118] ThreadID=14460
-[2026-08-26 09:22:32.119] Session=6
-[2026-08-26 09:22:34.123] UI still running after 2000 ms — OK.
-[2026-08-26 09:22:34.126] --- LaunchForSession SUCCESS (inherited desktop) ---
-[2026-08-26 09:22:34.127] SUCCESS: UI launched in session 6
-[2026-08-26 09:22:34.127] Launch FINISHED
-[2026-08-26 09:22:34.128] ========================================
+[2026-08-26 09:42:36.861] ========================================
+[2026-08-26 09:42:36.867] LaunchForActiveUser STARTED
+[2026-08-26 09:42:36.868] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
+[2026-08-26 09:42:36.868] Service process ID: 9796
+[2026-08-26 09:42:36.869] Current user: EXO-PC2$
+[2026-08-26 09:42:36.870] Machine: SN78085051124
+[2026-08-26 09:42:36.870] 64-bit OS: True
+[2026-08-26 09:42:36.870] 64-bit process: True
+[2026-08-26 09:42:36.871] UI file exists. Size=151552 bytes
+[2026-08-26 09:42:36.871] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:36.872] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:36.874] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:36.875] Session found: ID=0, State=4
+[2026-08-26 09:42:36.876] Session found: ID=9, State=1
+[2026-08-26 09:42:36.876] Session found: ID=65536, State=6
+[2026-08-26 09:42:36.877] ========================================
+[2026-08-26 09:42:36.878] LaunchForActiveUser STARTED
+[2026-08-26 09:42:36.878] Launch FINISHED
+[2026-08-26 09:42:36.879] ========================================
+[2026-08-26 09:42:36.880] Current user: EXO-PC2$
+[2026-08-26 09:42:36.881] Machine: SN78085051124
+[2026-08-26 09:42:36.881] 64-bit OS: True
+[2026-08-26 09:42:36.882] 64-bit process: True
+[2026-08-26 09:42:36.882] UI file exists. Size=151552 bytes
+[2026-08-26 09:42:36.883] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:36.883] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:36.884] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:36.885] Session found: ID=0, State=4
+[2026-08-26 09:42:36.885] Session found: ID=9, State=1
+[2026-08-26 09:42:36.886] Session found: ID=65536, State=6
+[2026-08-26 09:42:36.886] ERROR: No suitable session could be used.
+[2026-08-26 09:42:36.886] Launch FINISHED
+[2026-08-26 09:42:36.887] ========================================
+[2026-08-26 09:42:38.878] ========================================
+[2026-08-26 09:42:38.881] LaunchForActiveUser STARTED
+[2026-08-26 09:42:38.882] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
+[2026-08-26 09:42:38.883] Service process ID: 9796
+[2026-08-26 09:42:38.884] Current user: EXO-PC2$
+[2026-08-26 09:42:38.885] Machine: SN78085051124
+[2026-08-26 09:42:38.885] 64-bit OS: True
+[2026-08-26 09:42:38.886] 64-bit process: True
+[2026-08-26 09:42:38.886] UI file exists. Size=151552 bytes
+[2026-08-26 09:42:38.887] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:38.888] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:38.888] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:38.889] Session found: ID=0, State=4
+[2026-08-26 09:42:38.889] Session found: ID=9, State=1
+[2026-08-26 09:42:38.890] Session found: ID=65536, State=6
+[2026-08-26 09:42:38.891] ERROR: No suitable session could be used.
+[2026-08-26 09:42:38.891] Launch FINISHED
+[2026-08-26 09:42:38.892] ========================================
+[2026-08-26 09:42:40.907] ========================================
+[2026-08-26 09:42:40.910] LaunchForActiveUser STARTED
+[2026-08-26 09:42:40.912] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
+[2026-08-26 09:42:40.913] Service process ID: 9796
+[2026-08-26 09:42:40.914] Machine: SN78085051124
+[2026-08-26 09:42:40.915] 64-bit OS: True
+[2026-08-26 09:42:40.915] 64-bit OS: True
+[2026-08-26 09:42:40.916] 64-bit process: True
+[2026-08-26 09:42:40.917] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:40.917] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:40.918] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:40.918] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:40.919] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:40.919] Session found: ID=0, State=4
+[2026-08-26 09:42:40.920] Session found: ID=9, State=1
+[2026-08-26 09:42:40.921] Session found: ID=65536, State=6
+[2026-08-26 09:42:40.921] Launch FINISHED
+[2026-08-26 09:42:40.922] ========================================
+[2026-08-26 09:42:40.923] ========================================
+[2026-08-26 09:42:42.922] ========================================
+[2026-08-26 09:42:42.924] LaunchForActiveUser STARTED
+[2026-08-26 09:42:42.925] LaunchForActiveUser STARTED
+[2026-08-26 09:42:42.926] Service process ID: 9796
+[2026-08-26 09:42:42.926] Service process ID: 9796
+[2026-08-26 09:42:42.927] Machine: SN78085051124
+[2026-08-26 09:42:42.928] Machine: SN78085051124
+[2026-08-26 09:42:42.928] 64-bit process: True
+[2026-08-26 09:42:42.929] 64-bit process: True
+[2026-08-26 09:42:42.929] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:42.930] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:42.931] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:42.932] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:42.933] Session found: ID=0, State=4
+[2026-08-26 09:42:42.933] Session found: ID=9, State=0
+[2026-08-26 09:42:42.934] Session found: ID=0, State=4
+[2026-08-26 09:42:42.935] --- LaunchForSession START --- Session=9
+[2026-08-26 09:42:42.936] TARGET SESSION: 9
+[2026-08-26 09:42:42.937] --- LaunchForSession START --- Session=9
+[2026-08-26 09:42:42.938] Calling WTSQueryUserToken(9)...
+[2026-08-26 09:42:42.940] WTSQueryUserToken SUCCESS. Token=932
+[2026-08-26 09:42:42.941] Calling DuplicateTokenEx...
+[2026-08-26 09:42:42.942] DuplicateTokenEx SUCCESS. PrimaryToken=1476
+[2026-08-26 09:42:42.943] Calling CreateEnvironmentBlock...
+[2026-08-26 09:42:42.947] CreateEnvironmentBlock SUCCESS. Environment=2970013094528
+[2026-08-26 09:42:42.948] STARTUPINFO configured. Desktop=(null, inherited)
+[2026-08-26 09:42:42.949] Calling CreateProcessAsUser...
+[2026-08-26 09:42:42.950] ApplicationName=C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
+[2026-08-26 09:42:42.950] CreationFlags=1056
+[2026-08-26 09:42:42.951] CreationFlags=1056
+[2026-08-26 09:42:43.431] CreateProcessAsUser SUCCESS!
+[2026-08-26 09:42:43.432] PID=16772
+[2026-08-26 09:42:43.433] ThreadID=4424
+[2026-08-26 09:42:43.434] Session=9
+[2026-08-26 09:42:45.440] UI still running after 2000 ms — OK.
+[2026-08-26 09:42:45.442] --- LaunchForSession SUCCESS (inherited desktop) ---
+[2026-08-26 09:42:45.446] SUCCESS: UI launched in session 9
+[2026-08-26 09:42:45.448] Launch FINISHED
+[2026-08-26 09:42:45.450] ========================================
+[2026-08-26 09:42:46.246] ========================================
+[2026-08-26 09:42:46.247] LaunchForActiveUser STARTED
+[2026-08-26 09:42:46.247] UI path: C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
+[2026-08-26 09:42:46.248] Service process ID: 9796
+[2026-08-26 09:42:46.249] Current user: EXO-PC2$
+[2026-08-26 09:42:46.249] Machine: SN78085051124
+[2026-08-26 09:42:46.250] 64-bit OS: True
+[2026-08-26 09:42:46.251] 64-bit process: True
+[2026-08-26 09:42:46.252] UI file exists. Size=151552 bytes
+[2026-08-26 09:42:46.252] UI LastWriteTime=26.08.2026 7:46:28
+[2026-08-26 09:42:46.253] Calling WTSEnumerateSessions...
+[2026-08-26 09:42:46.254] WTSEnumerateSessions OK. Sessions=3
+[2026-08-26 09:42:46.254] Session found: ID=0, State=4
+[2026-08-26 09:42:46.255] Session found: ID=9, State=0
+[2026-08-26 09:42:46.256] TARGET SESSION: 9
+[2026-08-26 09:42:46.256] --- LaunchForSession START --- Session=9
+[2026-08-26 09:42:46.257] Calling WTSQueryUserToken(9)...
+[2026-08-26 09:42:46.257] WTSQueryUserToken SUCCESS. Token=1624
+[2026-08-26 09:42:46.258] Calling DuplicateTokenEx...
+[2026-08-26 09:42:46.258] DuplicateTokenEx SUCCESS. PrimaryToken=932
+[2026-08-26 09:42:46.259] Calling CreateEnvironmentBlock...
+[2026-08-26 09:42:46.262] CreateEnvironmentBlock SUCCESS. Environment=2970010047440
+[2026-08-26 09:42:46.264] STARTUPINFO configured. Desktop=(null, inherited)
+[2026-08-26 09:42:46.264] Calling CreateProcessAsUser...
+[2026-08-26 09:42:46.265] ApplicationName=C:\Program Files\LastAuthentication\ui\LastAuthentication.UI.exe
+[2026-08-26 09:42:46.266] WorkingDirectory=C:\Program Files\LastAuthentication\ui
+[2026-08-26 09:42:46.266] CreationFlags=1056
+[2026-08-26 09:42:46.280] CreateProcessAsUser SUCCESS!
+[2026-08-26 09:42:46.281] PID=1680
+[2026-08-26 09:42:46.281] ThreadID=11348
+[2026-08-26 09:42:46.282] Session=9
+[2026-08-26 09:42:48.281] UI still running after 2000 ms — OK.
+[2026-08-26 09:42:48.282] --- LaunchForSession SUCCESS (inherited desktop) ---
+[2026-08-26 09:42:48.283] SUCCESS: UI launched in session 9
+[2026-08-26 09:42:48.284] Launch FINISHED
+[2026-08-26 09:42:48.284] ========================================
